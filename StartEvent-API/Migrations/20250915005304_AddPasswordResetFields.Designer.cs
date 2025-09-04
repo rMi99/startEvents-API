@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using StartEvent_API.Data;
 
@@ -11,9 +12,11 @@ using StartEvent_API.Data;
 namespace StartEvent_API.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250915005304_AddPasswordResetFields")]
+    partial class AddPasswordResetFields
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -417,40 +420,6 @@ namespace StartEvent_API.Migrations
                     b.ToTable("LoyaltyPoints");
                 });
 
-            modelBuilder.Entity("StartEvent_API.Data.Entities.LoyaltyPointReservation", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("char(36)");
-
-                    b.Property<string>("CustomerId")
-                        .IsRequired()
-                        .HasColumnType("varchar(255)");
-
-                    b.Property<DateTime>("ExpiresAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<bool>("IsConfirmed")
-                        .HasColumnType("tinyint(1)");
-
-                    b.Property<DateTime>("ReservedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<int>("ReservedPoints")
-                        .HasColumnType("int");
-
-                    b.Property<Guid>("TicketId")
-                        .HasColumnType("char(36)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CustomerId");
-
-                    b.HasIndex("TicketId");
-
-                    b.ToTable("LoyaltyPointReservations");
-                });
-
             modelBuilder.Entity("StartEvent_API.Data.Entities.Payment", b =>
                 {
                     b.Property<Guid>("Id")
@@ -508,12 +477,6 @@ namespace StartEvent_API.Migrations
 
                     b.Property<bool>("IsPaid")
                         .HasColumnType("tinyint(1)");
-
-                    b.Property<int>("PointsEarned")
-                        .HasColumnType("int");
-
-                    b.Property<int>("PointsRedeemed")
-                        .HasColumnType("int");
 
                     b.Property<DateTime>("PurchaseDate")
                         .HasColumnType("datetime(6)");
@@ -671,31 +634,12 @@ namespace StartEvent_API.Migrations
             modelBuilder.Entity("StartEvent_API.Data.Entities.LoyaltyPoint", b =>
                 {
                     b.HasOne("StartEvent_API.Data.Entities.ApplicationUser", "Customer")
-                        .WithMany("LoyaltyPointsHistory")
-                        .HasForeignKey("CustomerId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Customer");
-                });
-
-            modelBuilder.Entity("StartEvent_API.Data.Entities.LoyaltyPointReservation", b =>
-                {
-                    b.HasOne("StartEvent_API.Data.Entities.ApplicationUser", "Customer")
                         .WithMany()
                         .HasForeignKey("CustomerId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("StartEvent_API.Data.Entities.Ticket", "Ticket")
-                        .WithMany()
-                        .HasForeignKey("TicketId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
                     b.Navigation("Customer");
-
-                    b.Navigation("Ticket");
                 });
 
             modelBuilder.Entity("StartEvent_API.Data.Entities.Payment", b =>
@@ -746,8 +690,6 @@ namespace StartEvent_API.Migrations
 
             modelBuilder.Entity("StartEvent_API.Data.Entities.ApplicationUser", b =>
                 {
-                    b.Navigation("LoyaltyPointsHistory");
-
                     b.Navigation("OrganizedEvents");
 
                     b.Navigation("Tickets");

@@ -272,16 +272,16 @@ namespace StartEvent_API.Controllers
             }
         }
 
-        private async Task<string> GenerateTicketNumber()
+        private Task<string> GenerateTicketNumber()
         {
             // Generate unique ticket number
-            return $"TKT-{DateTime.Now:yyyyMMdd}-{new Random().Next(100000, 999999)}";
+            return Task.FromResult($"TKT-{DateTime.Now:yyyyMMdd}-{new Random().Next(100000, 999999)}");
         }
 
-        private async Task<string> GenerateTicketCode()
+        private Task<string> GenerateTicketCode()
         {
             // Generate unique ticket code for QR
-            return Guid.NewGuid().ToString("N")[..12].ToUpper();
+            return Task.FromResult(Guid.NewGuid().ToString("N")[..12].ToUpper());
         }
     }
 

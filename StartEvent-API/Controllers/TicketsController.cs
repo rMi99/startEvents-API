@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using StartEvent_API.Business;
 using StartEvent_API.Data.Entities;
 using StartEvent_API.Models;
+using StartEvent_API.Repositories;
 using System.Security.Claims;
 using System.ComponentModel.DataAnnotations;
 
@@ -14,11 +15,14 @@ namespace StartEvent_API.Controllers
     public class TicketsController : ControllerBase
     {
         private readonly ITicketService _ticketService;
+        private readonly ILoyaltyPointRepository _loyaltyPointRepository;
 
         public TicketsController(
-            ITicketService ticketService)
+            ITicketService ticketService,
+            ILoyaltyPointRepository loyaltyPointRepository)
         {
             _ticketService = ticketService;
+            _loyaltyPointRepository = loyaltyPointRepository;
         }
 
         /// <summary>
@@ -40,7 +44,8 @@ namespace StartEvent_API.Controllers
                     request.EventPriceId, 
                     request.Quantity, 
                     request.DiscountCode, 
-                    request.UseLoyaltyPoints);
+                    request.UseLoyaltyPoints,
+                    request.PointsToRedeem);
 
                 var ticketDto = new TicketDto
                 {
@@ -54,7 +59,9 @@ namespace StartEvent_API.Controllers
                     TotalAmount = ticket.TotalAmount,
                     PurchaseDate = ticket.PurchaseDate,
                     IsPaid = ticket.IsPaid,
-                    QrCodePath = ticket.QrCodePath
+                    QrCodePath = ticket.QrCodePath,
+                    PointsEarned = ticket.PointsEarned,
+                    PointsRedeemed = ticket.PointsRedeemed
                 };
 
                 return Ok(new { 
@@ -108,7 +115,9 @@ namespace StartEvent_API.Controllers
                     TotalAmount = ticket.TotalAmount,
                     PurchaseDate = ticket.PurchaseDate,
                     IsPaid = ticket.IsPaid,
-                    QrCodePath = ticket.QrCodePath
+                    QrCodePath = ticket.QrCodePath,
+                    PointsEarned = ticket.PointsEarned,
+                    PointsRedeemed = ticket.PointsRedeemed
                 };
 
                 return Ok(new { Success = true, Data = ticketDto });
@@ -148,6 +157,8 @@ namespace StartEvent_API.Controllers
                     PurchaseDate = ticket.PurchaseDate,
                     IsPaid = ticket.IsPaid,
                     QrCodePath = ticket.QrCodePath,
+                    PointsEarned = ticket.PointsEarned,
+                    PointsRedeemed = ticket.PointsRedeemed,
                     Event = ticket.Event != null ? new EventSummaryDto
                     {
                         Id = ticket.Event.Id,
@@ -222,33 +233,82 @@ namespace StartEvent_API.Controllers
         }
 
         /// <summary>
-        /// Use loyalty points for a ticket
+        /// Apply loyalty points redemption or fetch points earned for a booking
         /// </summary>
         [HttpPost("loyalty-points")]
         [Authorize(Roles = "Customer")]
-        public async Task<IActionResult> UseLoyaltyPoints([FromBody] UseLoyaltyPointsRequest request)
+        public async Task<IActionResult> LoyaltyPoints([FromBody] LoyaltyPointsRequest request)
         {
             try
             {
                 var customerId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-                var ticket = await _ticketService.GetTicketByIdAsync(request.TicketId);
+                if (string.IsNullOrEmpty(customerId))
+                    return Unauthorized("User not authenticated");
 
-                if (ticket == null)
-                    return NotFound(new { Success = false, Message = "Ticket not found" });
+                if (request.Action == "reserve")
+                {
+                    var ticket = await _ticketService.GetTicketByIdAsync(request.TicketId);
+                    if (ticket == null)
+                        return NotFound(new { Success = false, Message = "Ticket not found" });
 
-                if (ticket.CustomerId != customerId)
-                    return Forbid("You can only modify your own tickets");
+                    if (ticket.CustomerId != customerId)
+                        return Forbid("You can only modify your own tickets");
 
-                var success = await _ticketService.UseLoyaltyPointsAsync(request.TicketId, request.Points);
+                    var success = await _ticketService.ReserveLoyaltyPointsAsync(request.TicketId, request.RedeemPoints);
+                    if (!success)
+                        return BadRequest(new { Success = false, Message = "Insufficient loyalty points available" });
 
-                if (!success)
-                    return BadRequest(new { Success = false, Message = "Insufficient loyalty points or invalid ticket" });
+                    // Get updated points information
+                    var totalPoints = await _loyaltyPointRepository.GetTotalPointsByCustomerIdAsync(customerId);
+                    var availablePoints = await _loyaltyPointRepository.GetAvailablePointsByCustomerIdAsync(customerId);
+                    var discountApplied = request.RedeemPoints; // 1 point = 1 LKR
 
-                return Ok(new { Success = true, Message = "Loyalty points applied successfully" });
+                    return Ok(new { 
+                        Success = true, 
+                        Message = "Loyalty points reserved successfully",
+                        PointsUsed = request.RedeemPoints,
+                        DiscountApplied = discountApplied,
+                        RemainingPoints = totalPoints - request.RedeemPoints,
+                        AvailablePoints = availablePoints - request.RedeemPoints
+                    });
+                }
+                else if (request.Action == "confirm")
+                {
+                    var success = await _ticketService.ConfirmLoyaltyPointsRedemptionAsync(request.TicketId);
+                    if (!success)
+                        return BadRequest(new { Success = false, Message = "Unable to confirm loyalty points redemption" });
+
+                    // Get updated points information
+                    var totalPoints = await _loyaltyPointRepository.GetTotalPointsByCustomerIdAsync(customerId);
+                    var ticket = await _ticketService.GetTicketByIdAsync(request.TicketId);
+
+                    return Ok(new { 
+                        Success = true, 
+                        Message = "Payment confirmed and loyalty points processed",
+                        PointsUsed = ticket?.PointsRedeemed ?? 0,
+                        PointsEarned = ticket?.PointsEarned ?? 0,
+                        RemainingPoints = totalPoints
+                    });
+                }
+                else if (request.Action == "rollback")
+                {
+                    var success = await _ticketService.RollbackLoyaltyPointsAsync(request.TicketId);
+                    if (!success)
+                        return BadRequest(new { Success = false, Message = "Unable to rollback loyalty points" });
+
+                    var availablePoints = await _loyaltyPointRepository.GetAvailablePointsByCustomerIdAsync(customerId);
+                    return Ok(new { 
+                        Success = true, 
+                        Message = "Loyalty points reservation cancelled",
+                        AvailablePoints = availablePoints
+                    });
+                }
+                
+                return BadRequest(new { Success = false, Message = "Invalid action. Use 'reserve', 'confirm', or 'rollback'" });
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { Success = false, Message = "An error occurred while applying loyalty points", Error = ex.Message });
+                return StatusCode(500, new { Success = false, Message = "An error occurred while processing loyalty points", Error = ex.Message });
             }
         }
 
@@ -316,6 +376,7 @@ namespace StartEvent_API.Controllers
         public int Quantity { get; set; } = 1;
         public string? DiscountCode { get; set; }
         public bool UseLoyaltyPoints { get; set; } = false;
+        public int PointsToRedeem { get; set; } = 0;
     }
 
     public class ApplyPromotionRequest
@@ -324,7 +385,7 @@ namespace StartEvent_API.Controllers
         public string DiscountCode { get; set; } = string.Empty;
     }
 
-    public class UseLoyaltyPointsRequest
+    public class LoyaltyPointsRequest
     {
         [Required]
         public Guid TicketId { get; set; }
@@ -332,5 +393,7 @@ namespace StartEvent_API.Controllers
         [Required]
         [Range(1, int.MaxValue, ErrorMessage = "Points must be greater than zero")]
         public int Points { get; set; }
+        public string Action { get; set; } = string.Empty; // "redeem" or "award"
+        public int RedeemPoints { get; set; } = 0;
     }
 }

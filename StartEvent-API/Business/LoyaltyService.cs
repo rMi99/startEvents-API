@@ -53,23 +53,23 @@ namespace StartEvent_API.Business
             return balance >= points;
         }
 
-        public async Task<int> CalculateEarnedPointsAsync(decimal purchaseAmount)
+        public Task<int> CalculateEarnedPointsAsync(decimal purchaseAmount)
         {
             if (purchaseAmount <= 0)
-                return 0;
+                return Task.FromResult(0);
 
             // Calculate 10% of purchase amount as points
             var points = (int)Math.Floor(purchaseAmount * POINTS_EARNING_RATE);
-            return points;
+            return Task.FromResult(points);
         }
 
-        public async Task<decimal> CalculateDiscountFromPointsAsync(int points)
+        public Task<decimal> CalculateDiscountFromPointsAsync(int points)
         {
             if (points <= 0)
-                return 0;
+                return Task.FromResult(0m);
 
             // 1 point = 1 LKR discount
-            return points * POINTS_TO_CURRENCY_RATE;
+            return Task.FromResult(points * POINTS_TO_CURRENCY_RATE);
         }
     }
 }
