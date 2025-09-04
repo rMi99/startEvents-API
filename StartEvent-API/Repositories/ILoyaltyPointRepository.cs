@@ -13,5 +13,6 @@ namespace StartEvent_API.Repositories
         Task<bool> ExistsAsync(Guid id);
         Task<bool> RedeemPointsAsync(string customerId, int points);
         Task<bool> AddPointsAsync(string customerId, int points, string description);
+        Task<int> GetAvailablePointsByCustomerIdAsync(string customerId);
     }
 }

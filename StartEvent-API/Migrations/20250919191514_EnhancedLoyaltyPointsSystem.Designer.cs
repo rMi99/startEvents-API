@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using StartEvent_API.Data;
 
@@ -11,9 +12,11 @@ using StartEvent_API.Data;
 namespace StartEvent_API.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250919191514_EnhancedLoyaltyPointsSystem")]
+    partial class EnhancedLoyaltyPointsSystem
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -223,24 +226,6 @@ namespace StartEvent_API.Migrations
 
                     b.Property<string>("PasswordHash")
                         .HasColumnType("longtext");
-
-                    b.Property<int>("PasswordResetAttempts")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime?>("PasswordResetLastAttempt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<string>("PasswordResetOtp")
-                        .HasColumnType("longtext");
-
-                    b.Property<DateTime?>("PasswordResetOtpExpiry")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<string>("PasswordResetToken")
-                        .HasColumnType("longtext");
-
-                    b.Property<DateTime?>("PasswordResetTokenExpiry")
-                        .HasColumnType("datetime(6)");
 
                     b.Property<string>("PhoneNumber")
                         .HasColumnType("longtext");

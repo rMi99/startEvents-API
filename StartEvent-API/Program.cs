@@ -74,6 +74,7 @@ builder.Services.AddScoped<StartEvent_API.Repositories.ITicketRepository, StartE
 builder.Services.AddScoped<StartEvent_API.Repositories.IPaymentRepository, StartEvent_API.Repositories.PaymentRepository>();
 builder.Services.AddScoped<StartEvent_API.Repositories.IDiscountRepository, StartEvent_API.Repositories.DiscountRepository>();
 builder.Services.AddScoped<StartEvent_API.Repositories.ILoyaltyPointRepository, StartEvent_API.Repositories.LoyaltyPointRepository>();
+builder.Services.AddScoped<StartEvent_API.Repositories.ILoyaltyPointReservationRepository, StartEvent_API.Repositories.LoyaltyPointReservationRepository>();
 builder.Services.AddScoped<StartEvent_API.Repositories.IReportRepository, StartEvent_API.Repositories.ReportRepository>();
 builder.Services.AddScoped<StartEvent_API.Repositories.IQrRepository, StartEvent_API.Repositories.QrRepository>();
 builder.Services.AddScoped<StartEvent_API.Repositories.IVenueRepository, StartEvent_API.Repositories.VenueRepository>();
@@ -87,6 +88,7 @@ builder.Services.AddScoped<StartEvent_API.Business.IAuthService, StartEvent_API.
 builder.Services.AddScoped<StartEvent_API.Business.ITicketService, StartEvent_API.Business.TicketService>();
 builder.Services.AddScoped<StartEvent_API.Business.IReportService, StartEvent_API.Business.ReportService>();
 builder.Services.AddScoped<StartEvent_API.Business.IQrService, StartEvent_API.Business.QrService>();
+builder.Services.AddScoped<StartEvent_API.Business.ILoyaltyService, StartEvent_API.Business.LoyaltyService>();
 
 builder.Services.AddScoped<StartEvent_API.Repositories.IUserRepository, StartEvent_API.Repositories.UserRepository>();
 

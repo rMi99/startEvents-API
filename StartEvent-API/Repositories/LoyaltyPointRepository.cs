@@ -93,5 +93,42 @@ namespace StartEvent_API.Repositories
             await CreateAsync(loyaltyPoint);
             return true;
         }
+
+        public async Task<int> GetAvailablePointsByCustomerIdAsync(string customerId)
+        {
+            var totalPoints = await GetTotalPointsByCustomerIdAsync(customerId);
+            
+            try 
+            {
+                // Clean up expired reservations first
+                var expiredReservations = await _context.LoyaltyPointReservations
+                    .Where(r => r.CustomerId == customerId && !r.IsConfirmed && r.ExpiresAt <= DateTime.UtcNow)
+                    .ToListAsync();
+
+                if (expiredReservations.Any())
+                {
+                    _context.LoyaltyPointReservations.RemoveRange(expiredReservations);
+                    await _context.SaveChangesAsync();
+                }
+
+                // Subtract only active (non-expired) reserved points
+                var activeReservedPoints = await _context.LoyaltyPointReservations
+                    .Where(r => r.CustomerId == customerId && !r.IsConfirmed && r.ExpiresAt > DateTime.UtcNow)
+                    .SumAsync(r => r.ReservedPoints);
+
+                var availablePoints = Math.Max(0, totalPoints - activeReservedPoints);
+                
+                // Debug logging
+                Console.WriteLine($"Customer {customerId}: Total={totalPoints}, Reserved={activeReservedPoints}, Available={availablePoints}");
+                
+                return availablePoints;
+            }
+            catch (Exception ex)
+            {
+                // If there's an issue with reservations table, return total points as fallback
+                Console.WriteLine($"Error in GetAvailablePointsByCustomerIdAsync: {ex.Message}");
+                return totalPoints;
+            }
+        }
     }
 }

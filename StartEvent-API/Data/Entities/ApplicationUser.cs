@@ -28,8 +28,11 @@ namespace StartEvent_API.Data.Entities
         public DateTime? PasswordResetTokenExpiry { get; set; }
         public int PasswordResetAttempts { get; set; } = 0;
         public DateTime? PasswordResetLastAttempt { get; set; }
+        // Loyalty Points - computed property for easy access
+        public int LoyaltyPoints => LoyaltyPointsHistory?.Sum(lp => lp.Points) ?? 0;
 
         public ICollection<Ticket>? Tickets { get; set; }
         public ICollection<Event>? OrganizedEvents { get; set; }
+        public ICollection<LoyaltyPoint>? LoyaltyPointsHistory { get; set; }
     }
 }

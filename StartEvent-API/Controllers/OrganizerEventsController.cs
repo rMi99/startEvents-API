@@ -145,10 +145,10 @@ namespace StartEvent_API.Controllers
             {
                 Id = Guid.NewGuid(),
                 Title = createEventDto.Title,
-                Description = createEventDto.Description,
+                Description = createEventDto.Description ?? string.Empty,
                 EventDate = createEventDto.EventDate,
                 EventTime = createEventDto.EventTime,
-                Category = createEventDto.Category,
+                Category = createEventDto.Category ?? string.Empty,
                 Image = imagePath,
                 VenueId = createEventDto.VenueId,
                 IsPublished = createEventDto.IsPublished,
@@ -274,10 +274,10 @@ namespace StartEvent_API.Controllers
 
             // Update event properties
             existingEvent.Title = updateEventDto.Title;
-            existingEvent.Description = updateEventDto.Description;
+            existingEvent.Description = updateEventDto.Description ?? string.Empty;
             existingEvent.EventDate = updateEventDto.EventDate;
             existingEvent.EventTime = updateEventDto.EventTime;
-            existingEvent.Category = updateEventDto.Category;
+            existingEvent.Category = updateEventDto.Category ?? string.Empty;
             existingEvent.VenueId = updateEventDto.VenueId;
             existingEvent.IsPublished = updateEventDto.IsPublished;
             existingEvent.ModifiedAt = DateTime.UtcNow;
@@ -329,7 +329,7 @@ namespace StartEvent_API.Controllers
                 ImageUrl = !string.IsNullOrEmpty(existingEvent.Image) ? await _fileStorage.GetFileUrlAsync(existingEvent.Image) : null,
                 IsPublished = existingEvent.IsPublished,
                 VenueId = existingEvent.VenueId,
-                VenueName = null
+                VenueName = string.Empty
             };
 
             return Ok(eventDto);

@@ -18,25 +18,31 @@ namespace StartEvent_API.Controllers
     {
         private readonly IPaymentRepository _paymentRepository;
         private readonly ITicketRepository _ticketRepository;
+        private readonly ILoyaltyPointRepository _loyaltyPointRepository;
         private readonly IQrService _qrService;
         private readonly IConfiguration _configuration;
         private readonly IEmailService _emailService;
         private readonly ILogger<PaymentController> _logger;
+        private readonly ILoyaltyService _loyaltyService;
 
         public PaymentController(
             IPaymentRepository paymentRepository,
             ITicketRepository ticketRepository,
+            ILoyaltyPointRepository loyaltyPointRepository,
             IQrService qrService,
             IConfiguration configuration,
             IEmailService emailService,
-            ILogger<PaymentController> logger)
+            ILogger<PaymentController> logger,
+            ILoyaltyService loyaltyService)
         {
             _paymentRepository = paymentRepository;
             _ticketRepository = ticketRepository;
+            _loyaltyPointRepository = loyaltyPointRepository;
             _qrService = qrService;
             _configuration = configuration;
             _emailService = emailService;
             _logger = logger;
+            _loyaltyService = loyaltyService;
             StripeConfiguration.ApiKey = _configuration["Stripe:SecretKey"];
         }
 
@@ -137,6 +143,24 @@ namespace StartEvent_API.Controllers
                             TransactionId = null
                         };
                         await _paymentRepository.CreateAsync(payment);
+
+                        // Award loyalty points for manual payments too
+                        try
+                        {
+                            var earnedPoints = await _loyaltyService.CalculateEarnedPointsAsync(ticket.TotalAmount);
+                            if (earnedPoints > 0)
+                            {
+                                await _loyaltyService.AddPointsAsync(
+                                    ticket.CustomerId, 
+                                    earnedPoints, 
+                                    $"Earned {earnedPoints} points from manual payment (LKR {ticket.TotalAmount:F2})"
+                                );
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"Exception during loyalty points award for manual payment {ticket.Id}: {ex.Message}");
+                        }
                     }
 
                     try
@@ -201,10 +225,10 @@ namespace StartEvent_API.Controllers
                             ProductData = new SessionLineItemPriceDataProductDataOptions
                             {
                                 Name = ticketType,
-                                Description = $"{quantity} ticket(s) for {ticket.Event.Title}",
+                                Description = $" ticket(s) for {ticket.Event.Title}",
                             },
                         },
-                        Quantity = quantity, // Use quantity from frontend
+                        Quantity = 1,
                     },
                 },
                 Mode = "payment",
@@ -225,7 +249,7 @@ namespace StartEvent_API.Controllers
         }
 
         /// <summary>
-        /// Creates a Stripe Payment Intent for direct payment processing
+        /// Creates a Stripe Payment Intent for direct payment processing with loyalty points support
         /// </summary>
         [HttpPost("create-payment-intent")]
         // [Authorize(Roles = "Customer")]
@@ -249,16 +273,34 @@ namespace StartEvent_API.Controllers
 
             try
             {
+                var finalAmount = ticket.TotalAmount;
+                var loyaltyDiscount = 0m;
+                var actualPointsToUse = 0;
+
+                // Handle loyalty points discount
+                if (request.UseLoyaltyPoints && request.LoyaltyPointsToUse > 0)
+                {
+                    var availablePoints = await _loyaltyPointRepository.GetAvailablePointsByCustomerIdAsync(userId);
+                    
+                    // Validate points to use
+                    actualPointsToUse = Math.Min(Math.Min(request.LoyaltyPointsToUse, availablePoints), (int)ticket.TotalAmount);
+                    loyaltyDiscount = actualPointsToUse; // 1 point = 1 LKR discount
+                    finalAmount = Math.Max(0, ticket.TotalAmount - loyaltyDiscount);
+                }
+
                 var paymentIntentService = new PaymentIntentService();
                 var paymentIntent = await paymentIntentService.CreateAsync(new PaymentIntentCreateOptions
                 {
-                    Amount = (long)(ticket.TotalAmount * 100), // Amount in cents
+                    Amount = (long)(finalAmount * 100), // Amount in cents after loyalty discount
                     Currency = "lkr",
                     PaymentMethodTypes = new List<string> { "card" },
                     Metadata = new Dictionary<string, string>
                     {
                         { "ticketId", ticket.Id.ToString() },
-                        { "customerId", userId }
+                        { "customerId", userId },
+                        { "loyaltyPointsUsed", actualPointsToUse.ToString() },
+                        { "loyaltyDiscount", loyaltyDiscount.ToString() },
+                        { "originalAmount", ticket.TotalAmount.ToString() }
                     }
                 });
 
@@ -266,7 +308,10 @@ namespace StartEvent_API.Controllers
                 {
                     ClientSecret = paymentIntent.ClientSecret,
                     PaymentIntentId = paymentIntent.Id,
-                    Amount = ticket.TotalAmount
+                    Amount = finalAmount,
+                    OriginalAmount = ticket.TotalAmount,
+                    LoyaltyDiscount = loyaltyDiscount,
+                    LoyaltyPointsUsed = actualPointsToUse
                 });
             }
             catch (Exception ex)
@@ -382,6 +427,52 @@ namespace StartEvent_API.Controllers
             {
                 // Mark ticket as paid
                 ticket.IsPaid = true;
+                
+                // Handle loyalty points if payment intent has metadata
+                var loyaltyPointsUsed = 0;
+                var loyaltyDiscount = 0m;
+                var originalAmount = ticket.TotalAmount;
+
+                try
+                {
+                    // Get payment intent to check for loyalty points metadata
+                    var paymentIntentService = new PaymentIntentService();
+                    var paymentIntent = await paymentIntentService.GetAsync(transactionId);
+                    
+                    if (paymentIntent?.Metadata != null)
+                    {
+                        if (paymentIntent.Metadata.ContainsKey("loyaltyPointsUsed"))
+                            int.TryParse(paymentIntent.Metadata["loyaltyPointsUsed"], out loyaltyPointsUsed);
+                        if (paymentIntent.Metadata.ContainsKey("loyaltyDiscount"))
+                            decimal.TryParse(paymentIntent.Metadata["loyaltyDiscount"], out loyaltyDiscount);
+                        if (paymentIntent.Metadata.ContainsKey("originalAmount"))
+                            decimal.TryParse(paymentIntent.Metadata["originalAmount"], out originalAmount);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning("Failed to retrieve payment intent metadata: {Error}", ex.Message);
+                }
+
+                // Redeem loyalty points if they were used
+                if (loyaltyPointsUsed > 0)
+                {
+                    await _loyaltyPointRepository.RedeemPointsAsync(ticket.CustomerId, loyaltyPointsUsed);
+                    ticket.PointsRedeemed = loyaltyPointsUsed;
+                }
+
+                // Award loyalty points for the purchase (based on original amount)
+                var pointsToEarn = Math.Floor(originalAmount / 10); // 1 point per 10 LKR
+                if (pointsToEarn > 0)
+                {
+                    await _loyaltyPointRepository.AddPointsAsync(
+                        ticket.CustomerId, 
+                        (int)pointsToEarn, 
+                        $"Earned from ticket purchase #{ticket.TicketNumber}"
+                    );
+                    ticket.PointsEarned = (int)pointsToEarn;
+                }
+
                 await _ticketRepository.UpdateAsync(ticket);
 
                 // Create payment record
@@ -400,6 +491,33 @@ namespace StartEvent_API.Controllers
 
                 // Send payment and ticket confirmation emails
                 await SendTicketConfirmationEmailAsync(ticket, payment);
+                // Award loyalty points (10% of ticket purchase price)
+                try
+                {
+                    var earnedPoints = await _loyaltyService.CalculateEarnedPointsAsync(ticket.TotalAmount);
+                    if (earnedPoints > 0)
+                    {
+                        var loyaltySuccess = await _loyaltyService.AddPointsAsync(
+                            ticket.CustomerId, 
+                            earnedPoints, 
+                            $"Earned {earnedPoints} points from ticket purchase (LKR {ticket.TotalAmount:F2})"
+                        );
+                        
+                        if (loyaltySuccess)
+                        {
+                            Console.WriteLine($"Awarded {earnedPoints} loyalty points to customer {ticket.CustomerId} for ticket {ticketId}");
+                        }
+                        else
+                        {
+                            Console.WriteLine($"Failed to award loyalty points to customer {ticket.CustomerId} for ticket {ticketId}");
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // Log the error but don't fail the payment process
+                    Console.WriteLine($"Exception during loyalty points award for ticket {ticketId}: {ex.Message}");
+                }
 
                 // Generate QR code automatically after successful payment
                 try
@@ -516,6 +634,8 @@ namespace StartEvent_API.Controllers
     public class CreatePaymentIntentRequest
     {
         public Guid TicketId { get; set; }
+        public bool UseLoyaltyPoints { get; set; } = false;
+        public int LoyaltyPointsToUse { get; set; } = 0;
     }
 
     public class ProcessPaymentRequest
