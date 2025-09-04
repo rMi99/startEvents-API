@@ -21,6 +21,7 @@ namespace StartEvent_API.Data.Entities
         public string? EmailVerificationCode { get; set; }
         public DateTime? EmailVerificationCodeExpiry { get; set; }
 
+<<<<<<< Updated upstream
         // Password reset OTP properties
         public string? PasswordResetOtp { get; set; }
         public DateTime? PasswordResetOtpExpiry { get; set; }
@@ -28,6 +29,8 @@ namespace StartEvent_API.Data.Entities
         public DateTime? PasswordResetTokenExpiry { get; set; }
         public int PasswordResetAttempts { get; set; } = 0;
         public DateTime? PasswordResetLastAttempt { get; set; }
+=======
+>>>>>>> Stashed changes
         // Loyalty Points - computed property for easy access
         public int LoyaltyPoints => LoyaltyPointsHistory?.Sum(lp => lp.Points) ?? 0;
 
