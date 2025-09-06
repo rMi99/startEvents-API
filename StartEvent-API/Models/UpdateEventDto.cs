@@ -36,6 +36,52 @@ public class UpdateEventDto
     public string? PricesJson { get; set; }
 }
 
+public class AdminUpdateEventDto
+{
+    [Required]
+    [StringLength(200)]
+    public string Title { get; set; } = string.Empty;
+
+    [StringLength(1000)]
+    public string? Description { get; set; }
+
+    [Required]
+    public string EventDate { get; set; } = string.Empty;
+
+    [Required]
+    public string EventTime { get; set; } = string.Empty;
+
+    [StringLength(100)]
+    public string? Category { get; set; }
+
+    public string? ImageUrl { get; set; }
+
+    [Required]
+    public Guid VenueId { get; set; }
+
+    public bool IsPublished { get; set; } = true;
+
+    /// <summary>
+    /// Array of price information directly from JSON
+    /// </summary>
+    public List<AdminUpdateEventPriceDto>? Prices { get; set; }
+}
+
+public class AdminUpdateEventPriceDto
+{
+    [Required]
+    [StringLength(100)]
+    public string Category { get; set; } = string.Empty;
+
+    [Required]
+    [Range(0, double.MaxValue)]
+    public decimal Price { get; set; }
+
+    [Required]
+    [Range(0, int.MaxValue)]
+    public int Stock { get; set; }
+}
+
 public class UpdateEventPriceDto
 {
     [Required]

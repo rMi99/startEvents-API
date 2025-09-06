@@ -30,7 +30,7 @@ namespace StartEvent_API.Controllers
         /// <param name="category">Filter by event category (case-insensitive exact match)</param>
         /// <param name="keyword">Search in event title or description</param>
         /// <returns>List of upcoming events matching the criteria</returns>
-        // GET: api/events
+        // GET: api/events?f
         [HttpGet]
         public async Task<IActionResult> GetUpcomingEvents([FromQuery] DateTime? fromDate, [FromQuery] DateTime? toDate, [FromQuery] string? venue, [FromQuery] Guid? venueId, [FromQuery] string? category, [FromQuery] string? keyword)
         {

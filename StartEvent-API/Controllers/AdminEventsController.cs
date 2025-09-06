@@ -5,6 +5,7 @@ using StartEvent_API.Data;
 using StartEvent_API.Data.Entities;
 using StartEvent_API.Models;
 using StartEvent_API.Helper;
+using System.Text.Json;
 
 namespace StartEvent_API.Controllers
 {
@@ -194,6 +195,153 @@ namespace StartEvent_API.Controllers
                 OrganizationName = eventEntity.Organizer?.OrganizationName,
                 CreatedAt = eventEntity.CreatedAt,
                 ModifiedAt = eventEntity.ModifiedAt
+            };
+
+            return Ok(adminEventDto);
+        }
+
+        /// <summary>
+        /// Updates an event (Admin can update any event)
+        /// </summary>
+        /// <param name="id">Event ID</param>
+        /// <param name="updateDto">Event update data</param>
+        /// <returns>Updated event information</returns>
+        [HttpPut("{id}")]
+        public async Task<IActionResult> UpdateEvent(Guid id, [FromBody] AdminUpdateEventDto updateDto)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            var existingEvent = await _context.Events
+                .Include(e => e.Prices)
+                .Include(e => e.Venue)
+                .Include(e => e.Organizer)
+                .FirstOrDefaultAsync(e => e.Id == id);
+
+            if (existingEvent == null)
+            {
+                return NotFound("Event not found");
+            }
+
+            // Handle image URL if provided
+            if (!string.IsNullOrEmpty(updateDto.ImageUrl))
+            {
+                existingEvent.Image = updateDto.ImageUrl;
+            }
+
+            // Parse and validate event date and time
+            if (!DateTime.TryParse(updateDto.EventDate, out var eventDate))
+            {
+                return BadRequest("Invalid EventDate format. Please use a valid date format.");
+            }
+
+            if (!TimeSpan.TryParse(updateDto.EventTime, out var eventTimeSpan))
+            {
+                return BadRequest("Invalid EventTime format. Please use HH:mm format.");
+            }
+
+            var eventTime = DateTime.Today.Add(eventTimeSpan);
+
+            // Update event properties
+            existingEvent.Title = updateDto.Title;
+            existingEvent.Description = updateDto.Description ?? string.Empty;
+            existingEvent.EventDate = eventDate;
+            existingEvent.EventTime = eventTime;
+            existingEvent.Category = updateDto.Category ?? string.Empty;
+            existingEvent.VenueId = updateDto.VenueId;
+            existingEvent.IsPublished = updateDto.IsPublished;
+            existingEvent.ModifiedAt = DateTime.UtcNow;
+
+            // Update event prices if provided
+            if (updateDto.Prices != null && updateDto.Prices.Any())
+            {
+                try
+                {
+                    // Remove existing prices explicitly from context to avoid concurrency issues
+                    var existingPrices = existingEvent.Prices.ToList();
+                    _context.EventPrices.RemoveRange(existingPrices);
+
+                    // Add new prices
+                    foreach (var priceDto in updateDto.Prices)
+                    {
+                        var eventPrice = new EventPrice
+                        {
+                            Id = Guid.NewGuid(),
+                            EventId = existingEvent.Id,
+                            Category = priceDto.Category,
+                            Price = priceDto.Price,
+                            Stock = priceDto.Stock,
+                            IsActive = true
+                        };
+                        _context.EventPrices.Add(eventPrice);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    return BadRequest($"Error processing prices: {ex.Message}");
+                }
+            }
+
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException ex)
+            {
+                // Reload the entity from database and try again
+                await _context.Entry(existingEvent).ReloadAsync();
+                
+                // Check if the event still exists
+                if (existingEvent == null)
+                {
+                    return NotFound("Event not found or has been deleted.");
+                }
+
+                // Try to save again with reloaded entity
+                try
+                {
+                    await _context.SaveChangesAsync();
+                }
+                catch (DbUpdateConcurrencyException)
+                {
+                    // Return conflict status if concurrency issues persist
+                    return Conflict(new { 
+                        message = "The event was modified by another user. Please refresh and try again.",
+                        details = ex.Message 
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                return BadRequest($"An error occurred while updating the event: {ex.Message}");
+            }
+
+            // Reload the event with updated data for response
+            await _context.Entry(existingEvent)
+                .Collection(e => e.Prices)
+                .LoadAsync();
+
+            var adminEventDto = new AdminEventDto
+            {
+                Id = existingEvent.Id,
+                Title = existingEvent.Title,
+                Description = existingEvent.Description,
+                EventDate = existingEvent.EventDate,
+                EventTime = existingEvent.EventTime,
+                Category = existingEvent.Category,
+                Image = existingEvent.Image,
+                ImageUrl = !string.IsNullOrEmpty(existingEvent.Image) ? await _fileStorage.GetFileUrlAsync(existingEvent.Image) : null,
+                IsPublished = existingEvent.IsPublished,
+                VenueId = existingEvent.VenueId,
+                VenueName = existingEvent.Venue?.Name ?? string.Empty,
+                OrganizerId = existingEvent.OrganizerId,
+                OrganizerName = existingEvent.Organizer?.FullName ?? string.Empty,
+                OrganizerEmail = existingEvent.Organizer?.Email,
+                OrganizationName = existingEvent.Organizer?.OrganizationName,
+                CreatedAt = existingEvent.CreatedAt,
+                ModifiedAt = existingEvent.ModifiedAt
             };
 
             return Ok(adminEventDto);
