@@ -389,13 +389,10 @@ namespace StartEvent_API.Controllers
     {
         [Required]
         public Guid TicketId { get; set; }
-<<<<<<< Updated upstream
         
         [Required]
         [Range(1, int.MaxValue, ErrorMessage = "Points must be greater than zero")]
         public int Points { get; set; }
-=======
->>>>>>> Stashed changes
         public string Action { get; set; } = string.Empty; // "redeem" or "award"
         public int RedeemPoints { get; set; } = 0;
     }
