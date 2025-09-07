@@ -1,9 +1,11 @@
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using StartEvent_API.Data;
 using StartEvent_API.Data.Entities;
 using System.Security.Claims;
+using System.Text.Json;
 using StartEvent_API.Models;
 using StartEvent_API.Helper;
 
@@ -16,11 +18,13 @@ namespace StartEvent_API.Controllers
     {
         private readonly ApplicationDbContext _context;
         private readonly IFileStorage _fileStorage;
+        private readonly UserManager<ApplicationUser> _userManager;
 
-        public OrganizerEventsController(ApplicationDbContext context, IFileStorage fileStorage)
+        public OrganizerEventsController(ApplicationDbContext context, IFileStorage fileStorage, UserManager<ApplicationUser> userManager)
         {
             _context = context;
             _fileStorage = fileStorage;
+            _userManager = userManager;
         }
 
         // GET: api/organizer/events
@@ -98,6 +102,13 @@ namespace StartEvent_API.Controllers
                 return Unauthorized("User not authenticated");
             }
 
+            // Check if organizer exists in the database
+            var organizer = await _userManager.FindByIdAsync(organizerId);
+            if (organizer == null)
+            {
+                return BadRequest("Organizer not found.");
+            }
+
             // Handle image - either file upload or URL
             string? imagePath = null;
             if (createEventDto.ImageFile != null && createEventDto.ImageFile.Length > 0)
@@ -162,7 +173,7 @@ namespace StartEvent_API.Controllers
             {
                 try
                 {
-                    var prices = System.Text.Json.JsonSerializer.Deserialize<List<CreateEventPriceDto>>(createEventDto.PricesJson);
+                    var prices = JsonSerializer.Deserialize<List<CreateEventPriceDto>>(createEventDto.PricesJson);
                     if (prices != null && prices.Any())
                     {
                         foreach (var priceDto in prices)
@@ -180,9 +191,13 @@ namespace StartEvent_API.Controllers
                         }
                     }
                 }
+                catch (JsonException)
+                {
+                    return BadRequest("Invalid PricesJson format. Please provide a valid JSON array of event prices.");
+                }
                 catch (Exception ex)
                 {
-                    return BadRequest($"Invalid prices JSON: {ex.Message}");
+                    return BadRequest($"Error processing prices JSON: {ex.Message}");
                 }
             }
 
@@ -220,6 +235,13 @@ namespace StartEvent_API.Controllers
             if (string.IsNullOrEmpty(organizerId))
             {
                 return Unauthorized("User not authenticated");
+            }
+
+            // Check if organizer exists in the database
+            var organizer = await _userManager.FindByIdAsync(organizerId);
+            if (organizer == null)
+            {
+                return BadRequest("Organizer not found.");
             }
 
             var existingEvent = await _context.Events
@@ -287,11 +309,12 @@ namespace StartEvent_API.Controllers
             {
                 try
                 {
-                    var prices = System.Text.Json.JsonSerializer.Deserialize<List<UpdateEventPriceDto>>(updateEventDto.PricesJson);
+                    var prices = JsonSerializer.Deserialize<List<UpdateEventPriceDto>>(updateEventDto.PricesJson);
                     if (prices != null)
                     {
-                        // Remove existing prices
-                        _context.EventPrices.RemoveRange(existingEvent.Prices);
+                        // Remove existing prices explicitly from context to avoid concurrency issues
+                        var existingPrices = existingEvent.Prices.ToList();
+                        _context.EventPrices.RemoveRange(existingPrices);
 
                         // Add new prices
                         foreach (var priceDto in prices)
@@ -305,17 +328,58 @@ namespace StartEvent_API.Controllers
                                 Stock = priceDto.AvailableTickets,
                                 IsActive = true
                             };
-                            existingEvent.Prices.Add(eventPrice);
+                            _context.EventPrices.Add(eventPrice);
                         }
                     }
                 }
+                catch (JsonException)
+                {
+                    return BadRequest("Invalid PricesJson format. Please provide a valid JSON array of event prices.");
+                }
                 catch (Exception ex)
                 {
-                    return BadRequest($"Invalid prices JSON: {ex.Message}");
+                    return BadRequest($"Error processing prices JSON: {ex.Message}");
                 }
             }
 
-            await _context.SaveChangesAsync();
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException ex)
+            {
+                // Reload the entity from database and try again
+                await _context.Entry(existingEvent).ReloadAsync();
+                
+                // Check if the event still exists
+                if (existingEvent == null)
+                {
+                    return NotFound("Event not found or has been deleted.");
+                }
+
+                // Try to save again with reloaded entity
+                try
+                {
+                    await _context.SaveChangesAsync();
+                }
+                catch (DbUpdateConcurrencyException)
+                {
+                    // Return conflict status if concurrency issues persist
+                    return Conflict(new { 
+                        message = "The event was modified by another user. Please refresh and try again.",
+                        details = ex.Message 
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                return BadRequest($"An error occurred while updating the event: {ex.Message}");
+            }
+
+            // Reload the event with updated prices for response
+            await _context.Entry(existingEvent)
+                .Collection(e => e.Prices)
+                .LoadAsync();
 
             var eventDto = new EventDto
             {

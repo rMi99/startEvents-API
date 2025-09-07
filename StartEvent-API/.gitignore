@@ -36,3 +36,4 @@ desktop.ini
 *.bak
 *.lock
 appsettings.json
+StartEvent-API/wwwroot/events/
