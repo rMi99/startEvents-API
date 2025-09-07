@@ -20,5 +20,9 @@
         public DateTime PurchaseDate { get; set; } = DateTime.UtcNow;
         public bool IsPaid { get; set; } = false;
         public string QrCodePath { get; set; } = default!;
+        
+        // Loyalty Points tracking
+        public int PointsEarned { get; set; } = 0;
+        public int PointsRedeemed { get; set; } = 0;
     }
 }

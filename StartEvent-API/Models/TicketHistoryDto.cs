@@ -15,6 +15,8 @@ namespace StartEvent_API.Models
         public DateTime PurchaseDate { get; set; }
         public bool IsPaid { get; set; }
         public string? QrCodePath { get; set; }
+        public int PointsEarned { get; set; }
+        public int PointsRedeemed { get; set; }
         
         // Event details (without circular references)
         public EventSummaryDto? Event { get; set; }

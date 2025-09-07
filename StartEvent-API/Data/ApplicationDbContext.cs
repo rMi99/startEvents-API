@@ -19,4 +19,5 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
     public DbSet<Payment> Payments => Set<Payment>();
     public DbSet<Discount> Discounts => Set<Discount>();
     public DbSet<LoyaltyPoint> LoyaltyPoints => Set<LoyaltyPoint>();
+    public DbSet<LoyaltyPointReservation> LoyaltyPointReservations => Set<LoyaltyPointReservation>();
 }
