@@ -145,3 +145,4 @@ C:\Users\RamishaGimhanaSumana\OneDrive - esoft.lk\Desktop\startEvents-API\StartE
 C:\Users\RamishaGimhanaSumana\OneDrive - esoft.lk\Desktop\startEvents-API\StartEvent-API\obj\Debug\net9.0\StartEvent-API.pdb
 C:\Users\RamishaGimhanaSumana\OneDrive - esoft.lk\Desktop\startEvents-API\StartEvent-API\obj\Debug\net9.0\StartEvent-API.genruntimeconfig.cache
 C:\Users\RamishaGimhanaSumana\OneDrive - esoft.lk\Desktop\startEvents-API\StartEvent-API\obj\Debug\net9.0\ref\StartEvent-API.dll
+C:\Users\RamishaGimhanaSumana\OneDrive - esoft.lk\Desktop\startEvents-API\StartEvent-API\obj\Debug\net9.0\StartEvent-API.sourcelink.json

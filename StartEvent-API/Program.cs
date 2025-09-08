@@ -1,37 +1,61 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Identity.UI.Services;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
 using StartEvent_API.Data;
 using StartEvent_API.Data.Entities;
 using StartEvent_API.Data.Seeders;
-using Microsoft.AspNetCore.Identity.UI.Services;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Configure DB context
+// 1️⃣ Configure DB context
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") 
                        ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
 
-// Configure Identity with custom user and role
-builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options => 
-    options.SignIn.RequireConfirmedAccount = false)
-    .AddEntityFrameworkStores<ApplicationDbContext>()
-    .AddDefaultTokenProviders();
+// 2️⃣ Configure Identity with custom user and role
+builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
+{
+    options.SignIn.RequireConfirmedAccount = false;
+})
+.AddEntityFrameworkStores<ApplicationDbContext>()
+.AddDefaultTokenProviders();
 
-// Register Email sender
+// 3️⃣ Register Email sender
 builder.Services.AddTransient<IEmailSender, EmailSender>();
 
-// Add controllers (API)
-builder.Services.AddControllers();
+// 4️⃣ Add JWT Authentication BEFORE building the app
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options =>
+{
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+        ValidIssuer = builder.Configuration["Jwt:Issuer"],
+        ValidAudience = builder.Configuration["Jwt:Audience"],
+        IssuerSigningKey = new SymmetricSecurityKey(
+            Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]))
+    };
+});
 
-// Add OpenAPI/Swagger
+// 5️⃣ Add controllers and Swagger
+builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
-// Seed roles, users, and venues
+// 6️⃣ Seed roles, users, and venues
 using (var scope = app.Services.CreateScope())
 {
     var serviceProvider = scope.ServiceProvider;
@@ -40,7 +64,7 @@ using (var scope = app.Services.CreateScope())
     await VenueSeeder.SeedVenues(serviceProvider);
 }
 
-// Configure middleware
+// 7️⃣ Configure middleware
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -53,13 +77,11 @@ else
 }
 
 app.UseHttpsRedirection();
-app.UseAuthentication();
+app.UseAuthentication();   // <-- must come BEFORE UseAuthorization
 app.UseAuthorization();
 
-// Map API endpoints
+// 8️⃣ Map endpoints
 app.MapControllers();
-
-// Example: Simple test endpoint
 app.MapGet("/api/health", () => Results.Ok(new { status = "API Running" }));
 
 app.Run();
