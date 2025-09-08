@@ -1,29 +1,37 @@
-# Build directories
-/bin/
-/obj/
+### Build directories
+bin/
+obj/
+publish/
 
-# Visual Studio files
+### Visual Studio
 *.user
 *.suo
-*.vcxproj.user
-*.vscode/
+*.userosscache
+*.sln.docstates
+.vscode/
+.vs/
 
-# ASP.NET Core app settings (sensitive information)
-/appsettings.Development.json
-/appsettings.*.json
+### ASP.NET Core app settings (sensitive info)
+appsettings.Development.json
+appsettings.*.json
 
-# Logs
+### Logs
 *.log
 
-# Rider / JetBrains IDE
+### JetBrains Rider
 .idea/
 
-# Publish output
-/publish/
+### Node / frontend (if mixed project)
+node_modules/
+dist/
 
-# npm or node artifacts (if any)
-/node_modules/
-
-# OS generated files
+### OS generated files
 .DS_Store
 Thumbs.db
+desktop.ini
+
+### Others
+*.swp
+*.tmp
+*.bak
+*.lock
