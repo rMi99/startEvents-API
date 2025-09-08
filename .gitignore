@@ -1,0 +1,29 @@
+# Build directories
+/bin/
+/obj/
+
+# Visual Studio files
+*.user
+*.suo
+*.vcxproj.user
+*.vscode/
+
+# ASP.NET Core app settings (sensitive information)
+/appsettings.Development.json
+/appsettings.*.json
+
+# Logs
+*.log
+
+# Rider / JetBrains IDE
+.idea/
+
+# Publish output
+/publish/
+
+# npm or node artifacts (if any)
+/node_modules/
+
+# OS generated files
+.DS_Store
+Thumbs.db
