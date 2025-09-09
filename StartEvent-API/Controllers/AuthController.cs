@@ -1,10 +1,8 @@
-using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.IdentityModel.Tokens;
+using StartEvent_API.Business;
 using StartEvent_API.Data.Entities;
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
-using System.Text;
+using StartEvent_API.Helper;
 
 namespace StartEvent_API.Controllers
 {
@@ -12,81 +10,106 @@ namespace StartEvent_API.Controllers
     [ApiController]
     public class AuthController : ControllerBase
     {
-        private readonly UserManager<ApplicationUser> _userManager;
-        private readonly SignInManager<ApplicationUser> _signInManager;
-        private readonly IConfiguration _config;
+        private readonly IAuthService _authService;
+        private readonly IJwtService _jwtService;
 
-        public AuthController(UserManager<ApplicationUser> userManager,
-                              SignInManager<ApplicationUser> signInManager,
-                              IConfiguration config)
+        public AuthController(IAuthService authService, IJwtService jwtService)
         {
-            _userManager = userManager;
-            _signInManager = signInManager;
-            _config = config;
+            _authService = authService;
+            _jwtService = jwtService;
         }
 
         [HttpPost("register")]
-        public async Task<IActionResult> Register([FromBody] RegisterModel model)
+        public async Task<IActionResult> Register([FromBody] RegisterRequest request)
         {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(new { message = "Invalid request data", errors = ModelState.Values.SelectMany(v => v.Errors.Select(e => e.ErrorMessage)) });
+            }
+
             var user = new ApplicationUser
             {
-                UserName = model.Email,
-                Email = model.Email,
-                FullName = model.FullName
+                UserName = request.Email,
+                Email = request.Email,
+                FullName = request.FullName,
+                Address = request.Address,
+                DateOfBirth = request.DateOfBirth,
+                OrganizationName = request.OrganizationName,
+                OrganizationContact = request.OrganizationContact
             };
 
-            var result = await _userManager.CreateAsync(user, model.Password);
-            if (!result.Succeeded)
-                return BadRequest(result.Errors);
+            var result = await _authService.RegisterAsync(user, request.Password);
+            
+            if (result == null)
+            {
+                return BadRequest(new { message = "User registration failed" });
+            }
 
-            return Ok(new { Message = "User created successfully" });
+            // Generate JWT token
+            var roles = new List<string> { "User" }; // Default role
+            var token = _jwtService.GenerateToken(result, roles);
+
+            return Ok(new { 
+                message = "User registered successfully", 
+                user = result,
+                token = token
+            });
         }
 
         [HttpPost("login")]
-        public async Task<IActionResult> Login([FromBody] LoginModel model)
+        public async Task<IActionResult> Login([FromBody] LoginRequest request)
         {
-            var user = await _userManager.FindByEmailAsync(model.Email);
-            if (user == null) return Unauthorized();
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(new { message = "Invalid request data", errors = ModelState.Values.SelectMany(v => v.Errors.Select(e => e.ErrorMessage)) });
+            }
 
-            var result = await _signInManager.CheckPasswordSignInAsync(user, model.Password, false);
-            if (!result.Succeeded) return Unauthorized();
+            var result = await _authService.LoginAsync(request.Email, request.Password);
+            
+            if (result == null)
+            {
+                return Unauthorized(new { message = "Invalid email or password" });
+            }
 
-            var token = GenerateJwtToken(user);
-            return Ok(new { Token = token });
+            // Generate JWT token
+            var roles = new List<string> { "User" }; // Default role - in real app, get from user roles
+            var token = _jwtService.GenerateToken(result, roles);
+
+            return Ok(new { 
+                message = "Login successful", 
+                user = result,
+                token = token
+            });
         }
 
-        private string GenerateJwtToken(ApplicationUser user)
+        [HttpPost("logout")]
+        [Authorize]
+        public async Task<IActionResult> Logout()
         {
-            var claims = new[]
+            var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId))
             {
-                new Claim(JwtRegisteredClaimNames.Sub, user.Id),
-                new Claim(JwtRegisteredClaimNames.Email, user.Email),
-                new Claim(ClaimTypes.Name, user.UserName)
-            };
+                return Unauthorized(new { message = "User not authenticated" });
+            }
 
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Key"]));
-            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-
-            var token = new JwtSecurityToken(
-                issuer: _config["Jwt:Issuer"],
-                audience: _config["Jwt:Audience"],
-                claims: claims,
-                expires: DateTime.UtcNow.AddMinutes(double.Parse(_config["Jwt:DurationInMinutes"])),
-                signingCredentials: creds
-            );
-
-            return new JwtSecurityTokenHandler().WriteToken(token);
+            var result = await _authService.LogoutAsync(userId);
+            return Ok(new { message = "Logout successful", success = result });
         }
     }
 
-    public class RegisterModel
+    // Request models
+    public class RegisterRequest
     {
-        public string FullName { get; set; } = string.Empty;
         public string Email { get; set; } = string.Empty;
         public string Password { get; set; } = string.Empty;
+        public string FullName { get; set; } = string.Empty;
+        public string? Address { get; set; }
+        public DateTime? DateOfBirth { get; set; }
+        public string? OrganizationName { get; set; }
+        public string? OrganizationContact { get; set; }
     }
 
-    public class LoginModel
+    public class LoginRequest
     {
         public string Email { get; set; } = string.Empty;
         public string Password { get; set; } = string.Empty;

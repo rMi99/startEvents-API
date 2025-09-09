@@ -48,14 +48,34 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
-// 5️⃣ Add controllers and Swagger
+// 5️⃣ Register custom services
+builder.Services.AddScoped<StartEvent_API.Repositories.IAuthRepository, StartEvent_API.Repositories.AuthRepository>();
+builder.Services.AddScoped<StartEvent_API.Repositories.IAdminRepository, StartEvent_API.Repositories.AdminRepository>();
+builder.Services.AddScoped<StartEvent_API.Repositories.ITicketRepository, StartEvent_API.Repositories.TicketRepository>();
+builder.Services.AddScoped<StartEvent_API.Repositories.IPaymentRepository, StartEvent_API.Repositories.PaymentRepository>();
+builder.Services.AddScoped<StartEvent_API.Repositories.IDiscountRepository, StartEvent_API.Repositories.DiscountRepository>();
+builder.Services.AddScoped<StartEvent_API.Repositories.ILoyaltyPointRepository, StartEvent_API.Repositories.LoyaltyPointRepository>();
+builder.Services.AddScoped<StartEvent_API.Repositories.IReportRepository, StartEvent_API.Repositories.ReportRepository>();
+builder.Services.AddScoped<StartEvent_API.Repositories.IQrRepository, StartEvent_API.Repositories.QrRepository>();
+
+builder.Services.AddScoped<StartEvent_API.Helper.IJwtService, StartEvent_API.Helper.JwtService>();
+builder.Services.AddScoped<StartEvent_API.Helper.IFileStorage, StartEvent_API.Helper.LocalFileStorage>();
+builder.Services.AddScoped<StartEvent_API.Helper.IQrCodeGenerator, StartEvent_API.Helper.QrCodeGenerator>();
+builder.Services.AddScoped<StartEvent_API.Helper.IEmailNotificationService, StartEvent_API.Helper.EmailNotificationService>();
+
+builder.Services.AddScoped<StartEvent_API.Business.IAuthService, StartEvent_API.Business.AuthService>();
+builder.Services.AddScoped<StartEvent_API.Business.ITicketService, StartEvent_API.Business.TicketService>();
+builder.Services.AddScoped<StartEvent_API.Business.IReportService, StartEvent_API.Business.ReportService>();
+builder.Services.AddScoped<StartEvent_API.Business.IQrService, StartEvent_API.Business.QrService>();
+
+// 6️⃣ Add controllers and Swagger
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
-// 6️⃣ Seed roles, users, and venues
+// 7️⃣ Seed roles, users, and venues
 using (var scope = app.Services.CreateScope())
 {
     var serviceProvider = scope.ServiceProvider;
@@ -64,7 +84,7 @@ using (var scope = app.Services.CreateScope())
     await VenueSeeder.SeedVenues(serviceProvider);
 }
 
-// 7️⃣ Configure middleware
+// 8️⃣ Configure middleware
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -77,11 +97,14 @@ else
 }
 
 app.UseHttpsRedirection();
+
+// Enable static files for QR code images
+app.UseStaticFiles();
+
 app.UseAuthentication();   // <-- must come BEFORE UseAuthorization
 app.UseAuthorization();
 
-// 8️⃣ Map endpoints
+// 9️⃣ Map endpoints
 app.MapControllers();
-app.MapGet("/api/health", () => Results.Ok(new { status = "API Running" }));
 
 app.Run();
