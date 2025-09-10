@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using StartEvent_API.Business;
 using StartEvent_API.Data.Entities;
 using StartEvent_API.Helper;
+using Microsoft.AspNetCore.Identity;
 
 namespace StartEvent_API.Controllers
 {
@@ -12,13 +13,17 @@ namespace StartEvent_API.Controllers
     {
         private readonly IAuthService _authService;
         private readonly IJwtService _jwtService;
+        private readonly UserManager<ApplicationUser> _userManager;
 
-        public AuthController(IAuthService authService, IJwtService jwtService)
+        public AuthController(
+                    IAuthService authService,
+                    IJwtService jwtService,
+                    UserManager<ApplicationUser> userManager)
         {
             _authService = authService;
             _jwtService = jwtService;
+            _userManager = userManager;
         }
-
         [HttpPost("register")]
         public async Task<IActionResult> Register([FromBody] RegisterRequest request)
         {
@@ -39,7 +44,7 @@ namespace StartEvent_API.Controllers
             };
 
             var result = await _authService.RegisterAsync(user, request.Password);
-            
+
             if (result == null)
             {
                 return BadRequest(new { message = "User registration failed" });
@@ -49,8 +54,9 @@ namespace StartEvent_API.Controllers
             var roles = new List<string> { "User" }; // Default role
             var token = _jwtService.GenerateToken(result, roles);
 
-            return Ok(new { 
-                message = "User registered successfully", 
+            return Ok(new
+            {
+                message = "User registered successfully",
                 user = result,
                 token = token
             });
@@ -65,18 +71,20 @@ namespace StartEvent_API.Controllers
             }
 
             var result = await _authService.LoginAsync(request.Email, request.Password);
-            
+
             if (result == null)
             {
                 return Unauthorized(new { message = "Invalid email or password" });
             }
 
             // Generate JWT token
-            var roles = new List<string> { "User" }; // Default role - in real app, get from user roles
-            var token = _jwtService.GenerateToken(result, roles);
+            var user = await _userManager.FindByEmailAsync(request.Email);
+            var roles = await _userManager.GetRolesAsync(user);
+            var token = _jwtService.GenerateToken(user, roles);
 
-            return Ok(new { 
-                message = "Login successful", 
+            return Ok(new
+            {
+                message = "Login successful",
                 user = result,
                 token = token
             });
