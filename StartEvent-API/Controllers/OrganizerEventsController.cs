@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using StartEvent_API.Data;
 using StartEvent_API.Data.Entities;
 using System.Security.Claims;
+using StartEvent_API.Models;
 
 namespace StartEvent_API.Controllers
 {
@@ -28,7 +29,16 @@ namespace StartEvent_API.Controllers
                 .Where(e => e.OrganizerId == organizerId)
                 .Include(e => e.Venue)
                 .ToListAsync();
-            return Ok(events);
+            var eventDtos = events.Select(e => new EventDto
+            {
+                Id = e.Id,
+                Title = e.Title,
+                Description = e.Description,
+                EventDate = e.EventDate,
+                VenueId = e.VenueId,
+                VenueName = e.Venue != null ? e.Venue.Name : null
+            }).ToList();
+            return Ok(eventDtos);
         }
 
         // POST: api/organizer/events
