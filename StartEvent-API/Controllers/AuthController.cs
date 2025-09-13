@@ -79,11 +79,6 @@ namespace StartEvent_API.Controllers
 
             // Generate JWT token
             var user = await _userManager.FindByEmailAsync(request.Email);
-            if (user == null)
-            {
-                return Unauthorized(new { message = "Invalid email or password" });
-            }
-
             var roles = await _userManager.GetRolesAsync(user);
             var token = _jwtService.GenerateToken(user, roles);
 
