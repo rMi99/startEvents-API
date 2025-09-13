@@ -86,7 +86,8 @@ namespace StartEvent_API.Controllers
             {
                 message = "Login successful",
                 user = result,
-                token = token
+                roles,
+                token
             });
         }
 
