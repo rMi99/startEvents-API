@@ -78,6 +78,8 @@ builder.Services.AddScoped<StartEvent_API.Business.ITicketService, StartEvent_AP
 builder.Services.AddScoped<StartEvent_API.Business.IReportService, StartEvent_API.Business.ReportService>();
 builder.Services.AddScoped<StartEvent_API.Business.IQrService, StartEvent_API.Business.QrService>();
 
+builder.Services.AddScoped<StartEvent_API.Repositories.IUserRepository, StartEvent_API.Repositories.UserRepository>();
+
 // 6️⃣ Add controllers and Swagger
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
