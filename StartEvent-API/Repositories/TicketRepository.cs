@@ -113,15 +113,15 @@ namespace StartEvent_API.Repositories
             var prefix = "TKT";
             var timestamp = DateTime.UtcNow.ToString("yyyyMMddHHmmss");
             var random = new Random().Next(1000, 9999);
-            return $"{prefix}{timestamp}{random}";
+            return await Task.FromResult($"{prefix}{timestamp}{random}");
         }
 
         public async Task<string> GenerateTicketCodeAsync()
         {
             const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
             var random = new Random();
-            return new string(Enumerable.Repeat(chars, 8)
-                .Select(s => s[random.Next(s.Length)]).ToArray());
+            return await Task.FromResult(new string(Enumerable.Repeat(chars, 8)
+                .Select(s => s[random.Next(s.Length)]).ToArray()));
         }
     }
 }

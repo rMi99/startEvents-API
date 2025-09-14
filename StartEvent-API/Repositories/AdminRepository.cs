@@ -16,7 +16,7 @@ namespace StartEvent_API.Repositories
 
         public async Task<IEnumerable<ApplicationUser>> GetAllUsersAsync()
         {
-            return _userManager.Users.ToList();
+            return await Task.FromResult(_userManager.Users.ToList());
         }
 
         public async Task<ApplicationUser?> GetUserByIdAsync(string userId)

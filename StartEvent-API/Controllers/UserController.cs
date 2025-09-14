@@ -27,6 +27,10 @@ namespace StartEvent_API.Controllers
         public async Task<IActionResult> ChangeUsername([FromBody] ChangeUsernameRequest request)
         {
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (userId == null)
+            {
+                return Unauthorized("User not authenticated.");
+            }
             var user = await _userRepository.GetUserByIdAsync(userId);
 
             if (user == null)
@@ -49,11 +53,19 @@ namespace StartEvent_API.Controllers
         public async Task<IActionResult> ChangeEmail([FromBody] ChangeEmailRequest request)
         {
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (userId == null)
+            {
+                return Unauthorized("User not authenticated.");
+            }
             var user = await _userRepository.GetUserByIdAsync(userId);
 
             if (user == null)
             {
                 return NotFound("User not found.");
+            }
+            if (request.NewEmail == null)
+            {
+                return BadRequest("New email cannot be null.");
             }
 
             var token = await _userManager.GenerateChangeEmailTokenAsync(user, request.NewEmail);
@@ -71,11 +83,19 @@ namespace StartEvent_API.Controllers
         public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest request)
         {
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (userId == null)
+            {
+                return Unauthorized("User not authenticated.");
+            }
             var user = await _userRepository.GetUserByIdAsync(userId);
 
             if (user == null)
             {
                 return NotFound("User not found.");
+            }
+            if (request.OldPassword == null || request.NewPassword == null)
+            {
+                return BadRequest("Old password and new password cannot be null.");
             }
 
             var result = await _userManager.ChangePasswordAsync(user, request.OldPassword, request.NewPassword);
