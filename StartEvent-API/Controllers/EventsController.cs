@@ -47,5 +47,81 @@ namespace StartEvent_API.Controllers
             }).ToList();
             return Ok(eventDtos);
         }
+
+        // GET: api/events/{id}
+        [HttpGet("{id}")]
+        public async Task<IActionResult> GetEventById(Guid id)
+        {
+            var eventEntity = await _context.Events
+                .Include(e => e.Venue)
+                .Include(e => e.Organizer)
+                .Include(e => e.Prices)
+                .Include(e => e.Tickets)
+                .FirstOrDefaultAsync(e => e.Id == id);
+
+            if (eventEntity == null)
+            {
+                return NotFound("Event not found");
+            }
+
+            var frontendEventDto = new EventResponseDto
+            {
+                createdAt = eventEntity.CreatedAt.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
+                modifiedAt = eventEntity.ModifiedAt?.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
+                deletedAt = eventEntity.DeletedAt?.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
+                id = eventEntity.Id.ToString(),
+                venueId = eventEntity.VenueId.ToString(),
+                venue = new VenueResponseDto
+                {
+                    id = eventEntity.Venue?.Id.ToString() ?? "",
+                    name = eventEntity.Venue?.Name,
+                    location = eventEntity.Venue?.Location,
+                    capacity = eventEntity.Venue?.Capacity ?? 0
+                },
+                organizerId = eventEntity.OrganizerId,
+                organizer = new UserResponseDto
+                {
+                    id = eventEntity.Organizer?.Id ?? "",
+                    fullName = eventEntity.Organizer?.FullName,
+                    email = eventEntity.Organizer?.Email,
+                    address = eventEntity.Organizer?.Address,
+                    organizationName = eventEntity.Organizer?.OrganizationName,
+                    organizationContact = eventEntity.Organizer?.OrganizationContact,
+                    isActive = eventEntity.Organizer?.IsActive ?? false
+                },
+                title = eventEntity.Title,
+                description = eventEntity.Description,
+                eventDate = eventEntity.EventDate.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
+                eventTime = eventEntity.EventTime.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
+                category = eventEntity.Category,
+                image = eventEntity.Image,
+                isPublished = eventEntity.IsPublished,
+                tickets = eventEntity.Tickets?.Select(t => new TicketResponseDto
+                {
+                    id = t.Id.ToString(),
+                    customerId = t.CustomerId,
+                    eventId = t.EventId.ToString(),
+                    eventPriceId = t.EventPriceId.ToString(),
+                    ticketNumber = t.TicketNumber,
+                    ticketCode = t.TicketCode,
+                    quantity = t.Quantity,
+                    totalAmount = t.TotalAmount,
+                    purchaseDate = t.PurchaseDate.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
+                    isPaid = t.IsPaid,
+                    qrCodePath = t.QrCodePath
+                }).ToList(),
+                prices = eventEntity.Prices?.Select(p => new EventPriceResponseDto
+                {
+                    id = p.Id.ToString(),
+                    eventId = p.EventId.ToString(),
+                    category = p.Category,
+                    stock = p.Stock,
+                    isActive = p.IsActive,
+                    price = p.Price
+                }).ToList()
+            };
+
+            return Ok(frontendEventDto);
+        }
     }
 }
