@@ -42,11 +42,23 @@ namespace StartEvent_API.Business
                 
                 if (!result.Succeeded)
                 {
+                    // Log the specific errors
+                    var errors = string.Join(", ", result.Errors.Select(e => e.Description));
+                    Console.WriteLine($"User creation failed: {errors}");
                     return null;
                 }
 
-                // Add user to default role
-                await _authRepository.AddToRoleAsync(user, "User");
+                // Assign role based on organization name
+                string role = string.IsNullOrEmpty(user.OrganizationName) ? "Customer" : "Organizer";
+                var roleResult = await _authRepository.AddToRoleAsync(user, role);
+                
+                if (!roleResult.Succeeded)
+                {
+                    // Log role assignment errors
+                    var roleErrors = string.Join(", ", roleResult.Errors.Select(e => e.Description));
+                    Console.WriteLine($"Role assignment failed: {roleErrors}");
+                    return null;
+                }
 
                 // Update last login
                 user.LastLogin = DateTime.UtcNow;
@@ -54,8 +66,9 @@ namespace StartEvent_API.Business
 
                 return user;
             }
-            catch
+            catch (Exception ex)
             {
+                Console.WriteLine($"Registration exception: {ex.Message}");
                 return null;
             }
         }
