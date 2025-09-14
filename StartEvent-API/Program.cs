@@ -44,7 +44,7 @@ builder.Services.AddAuthentication(options =>
         ValidIssuer = builder.Configuration["Jwt:Issuer"],
         ValidAudience = builder.Configuration["Jwt:Audience"],
         IssuerSigningKey = new SymmetricSecurityKey(
-            Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]))
+            Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"] ?? throw new InvalidOperationException("JWT Key not found in configuration")))
     };
 });
 
@@ -116,9 +116,21 @@ app.UseCors("AllowAll");
 using (var scope = app.Services.CreateScope())
 {
     var serviceProvider = scope.ServiceProvider;
-    await UserRoleSeeder.SeedRoles(serviceProvider);
+    var context = serviceProvider.GetRequiredService<ApplicationDbContext>();
+    // await UserRoleSeeder.SeedRoles(serviceProvider);
     await UserRoleSeeder.SeedInitialUsers(serviceProvider);
     await VenueSeeder.SeedVenues(serviceProvider);
+
+    try
+    {
+        // Seed events
+        await EventBookingSeeder.SeedAsync(context);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error seeding event data: {ex.Message}");
+        throw; // Re-throw to preserve stack trace
+    }
 }
 
 // 8️⃣ Configure middleware

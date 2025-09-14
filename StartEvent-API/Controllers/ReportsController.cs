@@ -55,7 +55,7 @@ namespace StartEvent_API.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { Success = false, Message = "An error occurred while generating organizer report" });
+                return StatusCode(500, new { Success = false, Message = "An error occurred while generating organizer report", Error = ex.Message });
             }
         }
 
@@ -90,7 +90,7 @@ namespace StartEvent_API.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { Success = false, Message = "An error occurred while generating sales report" });
+                return StatusCode(500, new { Success = false, Message = "An error occurred while generating sales report", Error = ex.Message });
             }
         }
 
@@ -128,7 +128,7 @@ namespace StartEvent_API.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { Success = false, Message = "An error occurred while generating user statistics" });
+                return StatusCode(500, new { Success = false, Message = "An error occurred while generating user statistics", Error = ex.Message });
             }
         }
 
@@ -176,7 +176,7 @@ namespace StartEvent_API.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { Success = false, Message = "An error occurred while generating events report" });
+                return StatusCode(500, new { Success = false, Message = "An error occurred while generating events report", Error = ex.Message });
             }
         }
 
@@ -199,7 +199,7 @@ namespace StartEvent_API.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { Success = false, Message = "An error occurred while retrieving monitoring data" });
+                return StatusCode(500, new { Success = false, Message = "An error occurred while retrieving monitoring data", Error = ex.Message });
             }
         }
     }
