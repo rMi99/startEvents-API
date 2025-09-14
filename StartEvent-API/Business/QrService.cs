@@ -144,7 +144,7 @@ namespace StartEvent_API.Business
                 return new QrValidationResult
                 {
                     IsValid = false,
-                    Message = "Error validating ticket",
+                    Message = $"Error validating ticket: {ex.Message}",
                     TicketCode = ticketCode
                 };
             }

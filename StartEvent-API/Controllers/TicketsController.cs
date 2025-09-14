@@ -55,7 +55,7 @@ namespace StartEvent_API.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { Success = false, Message = "An error occurred while booking the ticket" });
+                return StatusCode(500, new { Success = false, Message = "An error occurred while booking the ticket", Error = ex.Message });
             }
         }
 
@@ -82,7 +82,7 @@ namespace StartEvent_API.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { Success = false, Message = "An error occurred while retrieving the ticket" });
+                return StatusCode(500, new { Success = false, Message = "An error occurred while retrieving the ticket", Error = ex.Message });
             }
         }
 
@@ -110,7 +110,7 @@ namespace StartEvent_API.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { Success = false, Message = "An error occurred while retrieving ticket history" });
+                return StatusCode(500, new { Success = false, Message = "An error occurred while retrieving ticket history", Error = ex.Message });
             }
         }
 
@@ -141,7 +141,7 @@ namespace StartEvent_API.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { Success = false, Message = "An error occurred while applying promotion" });
+                return StatusCode(500, new { Success = false, Message = "An error occurred while applying promotion", Error = ex.Message });
             }
         }
 
@@ -172,7 +172,7 @@ namespace StartEvent_API.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { Success = false, Message = "An error occurred while applying loyalty points" });
+                return StatusCode(500, new { Success = false, Message = "An error occurred while applying loyalty points", Error = ex.Message });
             }
         }
 
@@ -204,7 +204,7 @@ namespace StartEvent_API.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { Success = false, Message = "An error occurred while generating QR code" });
+                return StatusCode(500, new { Success = false, Message = "An error occurred while generating QR code", Error = ex.Message });
             }
         }
 
@@ -227,7 +227,7 @@ namespace StartEvent_API.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { Success = false, Message = "An error occurred while validating ticket" });
+                return StatusCode(500, new { Success = false, Message = "An error occurred while validating ticket", Error = ex.Message });
             }
         }
     }

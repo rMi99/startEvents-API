@@ -82,7 +82,7 @@ namespace StartEvent_API.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { Success = false, Message = "An error occurred while processing payment" });
+                return StatusCode(500, new { Success = false, Message = "An error occurred while processing payment", Error = ex.Message });
             }
         }
 
@@ -119,7 +119,7 @@ namespace StartEvent_API.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { Success = false, Message = "An error occurred while retrieving payment history" });
+                return StatusCode(500, new { Success = false, Message = "An error occurred while retrieving payment history", Error = ex.Message });
             }
         }
 
@@ -172,7 +172,7 @@ namespace StartEvent_API.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { Success = false, Message = "An error occurred while retrieving payment details" });
+                return StatusCode(500, new { Success = false, Message = "An error occurred while retrieving payment details", Error = ex.Message });
             }
         }
 
@@ -192,7 +192,7 @@ namespace StartEvent_API.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { Success = false, Message = "Webhook processing failed" });
+                return StatusCode(500, new { Success = false, Message = "Webhook processing failed", Error = ex.Message });
             }
         }
     }
