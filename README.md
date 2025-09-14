@@ -46,10 +46,12 @@ This repository contains the complete implementation of an **Online Event Ticket
 ## Technology Stack
 
 * **Backend:** ASP.NET MVC (C#)
-* **Frontend:** Razor Views, HTML, CSS, JavaScript
-* **Database:** SQL Server / MySQL
-* **Payment Integration:** Online payment gateways with secure transactions
+* **Frontend:** Next.js 15
+* **Database:** MySQL
+* **Payment Integration:** Stripe for secure payments
+* **Email Service:** Brevo API for notifications
 * **QR Code Generation:** For e-ticket validation
+* **Reporting:** Automated report generation for admin and organizers
 
 ## Marking Focus
 
