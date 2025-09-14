@@ -43,29 +43,99 @@ namespace StartEvent_API.Controllers
 
         // POST: api/organizer/events
         [HttpPost]
-        public async Task<IActionResult> CreateEvent([FromBody] Event newEvent)
+        public async Task<IActionResult> CreateEvent([FromBody] CreateEventDto createEventDto)
         {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
             var organizerId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            newEvent.OrganizerId = organizerId;
+            if (string.IsNullOrEmpty(organizerId))
+            {
+                return Unauthorized("User not authenticated");
+            }
+
+            // Create the event entity
+            var newEvent = new Event
+            {
+                Id = Guid.NewGuid(),
+                Title = createEventDto.Title,
+                Description = createEventDto.Description,
+                EventDate = createEventDto.EventDate,
+                EventTime = createEventDto.EventTime,
+                Category = createEventDto.Category,
+                Image = createEventDto.Image,
+                VenueId = createEventDto.VenueId,
+                IsPublished = createEventDto.IsPublished,
+                OrganizerId = organizerId,
+                CreatedAt = DateTime.UtcNow,
+                ModifiedAt = DateTime.UtcNow
+            };
+
+            // Add event prices if provided
+            if (createEventDto.Prices != null && createEventDto.Prices.Any())
+            {
+                foreach (var priceDto in createEventDto.Prices)
+                {
+                    var eventPrice = new EventPrice
+                    {
+                        Id = Guid.NewGuid(),
+                        EventId = newEvent.Id,
+                        Category = priceDto.Name,
+                        Price = priceDto.Price,
+                        Stock = priceDto.AvailableTickets,
+                        IsActive = true
+                    };
+                    newEvent.Prices.Add(eventPrice);
+                }
+            }
+
             _context.Events.Add(newEvent);
             await _context.SaveChangesAsync();
-            return CreatedAtAction(nameof(GetMyEvents), new { id = newEvent.Id }, newEvent);
+
+            var eventDto = new EventDto
+            {
+                Id = newEvent.Id,
+                Title = newEvent.Title,
+                Description = newEvent.Description,
+                EventDate = newEvent.EventDate,
+                VenueId = newEvent.VenueId,
+                VenueName = null
+            };
+
+            return CreatedAtAction(nameof(GetMyEvents), new { id = newEvent.Id }, eventDto);
         }
 
         // PUT: api/organizer/events/{id}
         [HttpPut("{id}")]
-        public async Task<IActionResult> UpdateEvent(Guid id, [FromBody] Event updatedEvent)
+        public async Task<IActionResult> UpdateEvent(Guid id, [FromBody] UpdateEventDto updateEventDto)
         {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
             var organizerId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(organizerId))
+            {
+                return Unauthorized("User not authenticated");
+            }
+
             var existingEvent = await _context.Events.FirstOrDefaultAsync(e => e.Id == id && e.OrganizerId == organizerId);
             if (existingEvent == null)
-                return NotFound();
+                return NotFound("Event not found or you don't have permission to update it");
 
-            existingEvent.Title = updatedEvent.Title;
-            existingEvent.Description = updatedEvent.Description;
-            existingEvent.EventDate = updatedEvent.EventDate;
-            existingEvent.VenueId = updatedEvent.VenueId;
-            // Add other updatable fields as needed
+            // Update event properties
+            existingEvent.Title = updateEventDto.Title;
+            existingEvent.Description = updateEventDto.Description;
+            existingEvent.EventDate = updateEventDto.EventDate;
+            existingEvent.EventTime = updateEventDto.EventTime;
+            existingEvent.Category = updateEventDto.Category;
+            existingEvent.Image = updateEventDto.Image;
+            existingEvent.VenueId = updateEventDto.VenueId;
+            existingEvent.IsPublished = updateEventDto.IsPublished;
+            existingEvent.ModifiedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
             return NoContent();
