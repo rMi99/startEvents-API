@@ -20,14 +20,14 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 {
     options.SignIn.RequireConfirmedAccount = false;
-    
+
     // Configure password requirements
     options.Password.RequireDigit = true;
     options.Password.RequiredLength = 6;
     options.Password.RequireNonAlphanumeric = false;
     options.Password.RequireUppercase = false;
     options.Password.RequireLowercase = false;
-    
+
     // Configure user requirements
     options.User.RequireUniqueEmail = true;
 })
@@ -67,6 +67,7 @@ builder.Services.AddScoped<StartEvent_API.Repositories.IDiscountRepository, Star
 builder.Services.AddScoped<StartEvent_API.Repositories.ILoyaltyPointRepository, StartEvent_API.Repositories.LoyaltyPointRepository>();
 builder.Services.AddScoped<StartEvent_API.Repositories.IReportRepository, StartEvent_API.Repositories.ReportRepository>();
 builder.Services.AddScoped<StartEvent_API.Repositories.IQrRepository, StartEvent_API.Repositories.QrRepository>();
+builder.Services.AddScoped<StartEvent_API.Repositories.IVenueRepository, StartEvent_API.Repositories.VenueRepository>();
 
 builder.Services.AddScoped<StartEvent_API.Helper.IJwtService, StartEvent_API.Helper.JwtService>();
 builder.Services.AddScoped<StartEvent_API.Helper.IFileStorage, StartEvent_API.Helper.LocalFileStorage>();
