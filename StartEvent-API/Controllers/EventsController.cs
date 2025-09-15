@@ -3,6 +3,7 @@ using StartEvent_API.Data.Entities;
 using StartEvent_API.Data;
 using Microsoft.EntityFrameworkCore;
 using StartEvent_API.Models;
+using StartEvent_API.Helper;
 
 namespace StartEvent_API.Controllers
 {
@@ -11,10 +12,12 @@ namespace StartEvent_API.Controllers
     public class EventsController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
+        private readonly IFileStorage _fileStorage;
 
-        public EventsController(ApplicationDbContext context)
+        public EventsController(ApplicationDbContext context, IFileStorage fileStorage)
         {
             _context = context;
+            _fileStorage = fileStorage;
         }
 
         // GET: api/events
@@ -42,6 +45,11 @@ namespace StartEvent_API.Controllers
                 Title = e.Title,
                 Description = e.Description,
                 EventDate = e.EventDate,
+                EventTime = e.EventTime,
+                Category = e.Category,
+                Image = e.Image,
+                ImageUrl = !string.IsNullOrEmpty(e.Image) ? _fileStorage.GetFileUrlAsync(e.Image).Result : null,
+                IsPublished = e.IsPublished,
                 VenueId = e.VenueId,
                 VenueName = e.Venue != null ? e.Venue.Name : null
             }).ToList();
