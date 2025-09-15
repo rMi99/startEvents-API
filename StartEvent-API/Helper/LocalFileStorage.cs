@@ -55,7 +55,7 @@ namespace StartEvent_API.Helper
                 var fullPath = Path.Combine(webRootPath, filePath);
                 if (File.Exists(fullPath))
                 {
-                    File.Delete(fullPath);
+                    await Task.Run(() => File.Delete(fullPath));
                     return true;
                 }
                 return false;

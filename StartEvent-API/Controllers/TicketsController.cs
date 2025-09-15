@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using StartEvent_API.Business;
 using StartEvent_API.Data.Entities;
+using StartEvent_API.Models;
 using System.Security.Claims;
 
 namespace StartEvent_API.Controllers
@@ -39,10 +40,25 @@ namespace StartEvent_API.Controllers
                     request.DiscountCode, 
                     request.UseLoyaltyPoints);
 
+                var ticketDto = new TicketDto
+                {
+                    Id = ticket.Id,
+                    CustomerId = ticket.CustomerId,
+                    EventId = ticket.EventId,
+                    EventPriceId = ticket.EventPriceId,
+                    TicketNumber = ticket.TicketNumber,
+                    TicketCode = ticket.TicketCode,
+                    Quantity = ticket.Quantity,
+                    TotalAmount = ticket.TotalAmount,
+                    PurchaseDate = ticket.PurchaseDate,
+                    IsPaid = ticket.IsPaid,
+                    QrCodePath = ticket.QrCodePath
+                };
+
                 return Ok(new { 
                     Success = true, 
                     Message = "Ticket booked successfully", 
-                    Data = ticket 
+                    Data = ticketDto 
                 });
             }
             catch (ArgumentException ex)

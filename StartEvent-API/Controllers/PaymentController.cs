@@ -2,180 +2,196 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using StartEvent_API.Data.Entities;
 using StartEvent_API.Repositories;
+using StartEvent_API.Business;
 using System.Security.Claims;
+using Stripe;
+using Stripe.Checkout;
 
 namespace StartEvent_API.Controllers
 {
     [Route("api/[controller]")]
-    [ApiController]
-    [Authorize]
+    // ... existing code ...
     public class PaymentController : ControllerBase
     {
         private readonly IPaymentRepository _paymentRepository;
         private readonly ITicketRepository _ticketRepository;
+        private readonly IQrService _qrService;
+        private readonly IConfiguration _configuration;
 
-        public PaymentController(IPaymentRepository paymentRepository, ITicketRepository ticketRepository)
+        public PaymentController(
+            IPaymentRepository paymentRepository, 
+            ITicketRepository ticketRepository, 
+            IQrService qrService,
+            IConfiguration configuration)
         {
             _paymentRepository = paymentRepository;
             _ticketRepository = ticketRepository;
+            _qrService = qrService;
+            _configuration = configuration;
+            StripeConfiguration.ApiKey = _configuration["Stripe:SecretKey"];
         }
 
         /// <summary>
-        /// Process payment for a ticket via Stripe
+        /// Creates a Stripe Checkout session for a ticket
         /// </summary>
-        [HttpPost("process")]
+        [HttpPost("create-checkout-session")]
         [Authorize(Roles = "Customer")]
-        public async Task<IActionResult> ProcessPayment([FromBody] ProcessPaymentRequest request)
+        public async Task<IActionResult> CreateCheckoutSession([FromBody] CreateCheckoutSessionRequest request)
         {
-            try
+            var ticket = await _ticketRepository.GetByIdAsync(request.TicketId);
+            if (ticket == null || ticket.Event == null)
             {
-                var customerId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-                if (string.IsNullOrEmpty(customerId))
-                    return Unauthorized("User not authenticated");
+                return NotFound(new { Message = "Ticket or associated event not found" });
+            }
 
-                var ticket = await _ticketRepository.GetByIdAsync(request.TicketId);
-                if (ticket == null)
-                    return NotFound(new { Success = false, Message = "Ticket not found" });
+            // Your frontend domain
+            var domain = _configuration["FrontendDomain"] ?? "http://localhost:3000";
 
-                if (ticket.CustomerId != customerId)
-                    return Forbid("You can only pay for your own tickets");
-
-                if (ticket.IsPaid)
-                    return BadRequest(new { Success = false, Message = "Ticket is already paid" });
-
-                // TODO: Integrate with Stripe API
-                // For now, we'll simulate a successful payment
-                var payment = new Payment
+            var options = new SessionCreateOptions
+            {
+                PaymentMethodTypes = new List<string> { "card" },
+                LineItems = new List<SessionLineItemOptions>
                 {
-                    Id = Guid.NewGuid(),
-                    CustomerId = customerId,
-                    TicketId = request.TicketId,
-                    Amount = ticket.TotalAmount,
-                    PaymentDate = DateTime.UtcNow,
-                    Status = "Completed", // In real implementation, this would come from Stripe
-                    PaymentMethod = request.PaymentMethod,
-                    TransactionId = $"stripe_{Guid.NewGuid()}" // In real implementation, this would be Stripe's transaction ID
-                };
-
-                await _paymentRepository.CreateAsync(payment);
-
-                // Update ticket as paid
-                ticket.IsPaid = true;
-                await _ticketRepository.UpdateAsync(ticket);
-
-                // TODO: Send confirmation email via Brevo
-                // await _emailService.SendTicketConfirmationAsync(ticket, payment);
-
-                return Ok(new
-                {
-                    Success = true,
-                    Message = "Payment processed successfully",
-                    Data = new
+                    new SessionLineItemOptions
                     {
-                        PaymentId = payment.Id,
-                        TransactionId = payment.TransactionId,
-                        Amount = payment.Amount,
-                        Status = payment.Status,
-                        TicketNumber = ticket.TicketNumber
-                    }
-                });
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new { Success = false, Message = "An error occurred while processing payment", Error = ex.Message });
-            }
-        }
-
-        /// <summary>
-        /// Get payment history for a customer
-        /// </summary>
-        [HttpGet("history")]
-        [Authorize(Roles = "Customer")]
-        public async Task<IActionResult> GetPaymentHistory()
-        {
-            try
-            {
-                var customerId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-                if (string.IsNullOrEmpty(customerId))
-                    return Unauthorized("User not authenticated");
-
-                var payments = await _paymentRepository.GetByCustomerIdAsync(customerId);
-
-                return Ok(new
-                {
-                    Success = true,
-                    Data = payments.Select(p => new
-                    {
-                        p.Id,
-                        p.Amount,
-                        p.PaymentDate,
-                        p.Status,
-                        p.PaymentMethod,
-                        p.TransactionId,
-                        TicketNumber = p.Ticket.TicketNumber,
-                        EventTitle = p.Ticket.Event.Title
-                    })
-                });
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new { Success = false, Message = "An error occurred while retrieving payment history", Error = ex.Message });
-            }
-        }
-
-        /// <summary>
-        /// Get payment details by ID
-        /// </summary>
-        [HttpGet("{id}")]
-        [Authorize(Roles = "Customer,Admin")]
-        public async Task<IActionResult> GetPayment(Guid id)
-        {
-            try
-            {
-                var customerId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-                var userRole = User.FindFirst(ClaimTypes.Role)?.Value;
-
-                var payment = await _paymentRepository.GetByIdAsync(id);
-                if (payment == null)
-                    return NotFound(new { Success = false, Message = "Payment not found" });
-
-                // Customers can only view their own payments, Admins can view any
-                if (userRole != "Admin" && payment.CustomerId != customerId)
-                    return Forbid("You can only view your own payments");
-
-                return Ok(new
-                {
-                    Success = true,
-                    Data = new
-                    {
-                        payment.Id,
-                        payment.Amount,
-                        payment.PaymentDate,
-                        payment.Status,
-                        payment.PaymentMethod,
-                        payment.TransactionId,
-                        Customer = new
+                        PriceData = new SessionLineItemPriceDataOptions
                         {
-                            payment.Customer.Id,
-                            payment.Customer.Email,
-                            payment.Customer.FullName
+                            UnitAmount = (long)(ticket.TotalAmount * 100), // Amount in cents
+                            Currency = "lkr",
+                            ProductData = new SessionLineItemPriceDataProductDataOptions
+                            {
+                                Name = ticket.Event.Title,
+                                Description = $"Ticket(s) for {ticket.Event.Title}",
+                            },
                         },
-                        Ticket = new
-                        {
-                            payment.Ticket.Id,
-                            payment.Ticket.TicketNumber,
-                            payment.Ticket.TicketCode,
-                            EventTitle = payment.Ticket.Event.Title
-                        }
+                        Quantity = ticket.Quantity,
+                    },
+                },
+                Mode = "payment",
+                // Stripe will redirect to these URLs after payment attempt
+                SuccessUrl = $"{domain}/booking-confirmation?success=true&session_id={{CHECKOUT_SESSION_ID}}",
+                CancelUrl = $"{domain}/events/{ticket.EventId}/booking?canceled=true",
+                // We pass the ticketId to identify the order in our webhook
+                ClientReferenceId = ticket.Id.ToString()
+            };
+
+            var service = new SessionService();
+            Session session = await service.CreateAsync(options);
+
+            return Ok(new { url = session.Url });
+        }
+
+        /// <summary>
+        /// Creates a Stripe Payment Intent for direct payment processing
+        /// </summary>
+        [HttpPost("create-payment-intent")]
+        // [Authorize(Roles = "Customer")]
+        public async Task<IActionResult> CreatePaymentIntent([FromBody] CreatePaymentIntentRequest request)
+        {
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId))
+                return Unauthorized(new { Message = "User not authenticated" });
+
+            var ticket = await _ticketRepository.GetByIdAsync(request.TicketId);
+            if (ticket == null)
+                return NotFound(new { Message = "Ticket not found" });
+
+            // Ensure user owns this ticket
+            if (ticket.CustomerId != userId)
+                return StatusCode(403, new { Message = "Access denied" });
+
+            // Check if already paid
+            if (ticket.IsPaid)
+                return BadRequest(new { Message = "Ticket is already paid" });
+
+            try
+            {
+                var paymentIntentService = new PaymentIntentService();
+                var paymentIntent = await paymentIntentService.CreateAsync(new PaymentIntentCreateOptions
+                {
+                    Amount = (long)(ticket.TotalAmount * 100), // Amount in cents
+                    Currency = "lkr",
+                    PaymentMethodTypes = new List<string> { "card" },
+                    Metadata = new Dictionary<string, string>
+                    {
+                        { "ticketId", ticket.Id.ToString() },
+                        { "customerId", userId }
                     }
+                });
+
+                return Ok(new
+                {
+                    ClientSecret = paymentIntent.ClientSecret,
+                    PaymentIntentId = paymentIntent.Id,
+                    Amount = ticket.TotalAmount
                 });
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { Success = false, Message = "An error occurred while retrieving payment details", Error = ex.Message });
+                return StatusCode(500, new { Message = "Failed to create payment intent", Error = ex.Message });
             }
         }
 
+        /// <summary>
+        /// Get payment status for a ticket
+        /// </summary>
+        [HttpGet("status/{ticketId}")]
+        [Authorize(Roles = "Customer")]
+        public async Task<IActionResult> GetPaymentStatus(Guid ticketId)
+        {
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId))
+                return Unauthorized(new { Message = "User not authenticated" });
+
+            var ticket = await _ticketRepository.GetByIdAsync(ticketId);
+            if (ticket == null)
+                return NotFound(new { Message = "Ticket not found" });
+
+            // Ensure user owns this ticket
+            if (ticket.CustomerId != userId)
+                return StatusCode(403, new { Message = "Access denied" });
+
+            var payments = await _paymentRepository.GetByTicketIdAsync(ticketId);
+            var payment = payments.FirstOrDefault();
+
+            return Ok(new
+            {
+                TicketId = ticketId,
+                IsPaid = ticket.IsPaid,
+                PaymentStatus = payment?.Status ?? "Pending",
+                PaymentDate = payment?.PaymentDate,
+                Amount = ticket.TotalAmount,
+                HasQrCode = !string.IsNullOrEmpty(ticket.QrCodePath)
+            });
+        }
+
+        /// <summary>
+        /// Get session status for payment confirmation
+        /// </summary>
+        [HttpGet("session-status/{sessionId}")]
+        [Authorize(Roles = "Customer")]
+        public async Task<IActionResult> GetSessionStatus(string sessionId)
+        {
+            try
+            {
+                var service = new SessionService();
+                var session = await service.GetAsync(sessionId);
+
+                return Ok(new
+                {
+                    Status = session.PaymentStatus,
+                    CustomerEmail = session.CustomerDetails?.Email,
+                    TicketId = session.ClientReferenceId
+                });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { Message = "Invalid session ID", Error = ex.Message });
+            }
+        }
+        
+     
+        
         /// <summary>
         /// Webhook endpoint for Stripe payment confirmations
         /// </summary>
@@ -183,21 +199,87 @@ namespace StartEvent_API.Controllers
         [AllowAnonymous]
         public async Task<IActionResult> StripeWebhook()
         {
-            try
-            {
-                // TODO: Implement Stripe webhook verification and processing
-                // This would handle payment confirmations, failures, and refunds from Stripe
+            var json = await new StreamReader(HttpContext.Request.Body).ReadToEndAsync();
+            var stripeEvent = EventUtility.ConstructEvent(json,
+                Request.Headers["Stripe-Signature"],
+                _configuration["Stripe:WebhookSecret"]);
 
-                return Ok(new { Success = true, Message = "Webhook received" });
-            }
-            catch (Exception ex)
+            // Handle the checkout.session.completed event
+            if (stripeEvent.Type == "checkout.session.completed")
             {
-                return StatusCode(500, new { Success = false, Message = "Webhook processing failed", Error = ex.Message });
+                var session = stripeEvent.Data.Object as Session;
+                if (session?.ClientReferenceId != null)
+                {
+                    var ticketId = Guid.Parse(session.ClientReferenceId);
+                    await ProcessSuccessfulPayment(ticketId, session.PaymentIntentId);
+                }
+            }
+            // Handle payment_intent.succeeded event for direct payments
+            else if (stripeEvent.Type == "payment_intent.succeeded")
+            {
+                var paymentIntent = stripeEvent.Data.Object as PaymentIntent;
+                if (paymentIntent?.Metadata?.ContainsKey("ticketId") == true)
+                {
+                    var ticketId = Guid.Parse(paymentIntent.Metadata["ticketId"]);
+                    await ProcessSuccessfulPayment(ticketId, paymentIntent.Id);
+                }
+            }
+
+            return Ok();
+        }
+
+        /// <summary>
+        /// Private method to handle successful payment processing
+        /// </summary>
+        private async Task ProcessSuccessfulPayment(Guid ticketId, string? transactionId)
+        {
+            var ticket = await _ticketRepository.GetByIdAsync(ticketId);
+            if (ticket != null && !ticket.IsPaid)
+            {
+                // Mark ticket as paid
+                ticket.IsPaid = true;
+                await _ticketRepository.UpdateAsync(ticket);
+
+                // Create payment record
+                var payment = new Data.Entities.Payment
+                {
+                    Id = Guid.NewGuid(),
+                    CustomerId = ticket.CustomerId,
+                    TicketId = ticket.Id,
+                    Amount = ticket.TotalAmount,
+                    PaymentDate = DateTime.UtcNow,
+                    Status = "Completed",
+                    PaymentMethod = "Card",
+                    TransactionId = transactionId
+                };
+                await _paymentRepository.CreateAsync(payment);
+
+                // Generate QR code automatically after successful payment
+                try
+                {
+                    await _qrService.GenerateQrCodeAsync(ticket.Id, ticket.CustomerId);
+                }
+                catch (Exception ex)
+                {
+                    // Log the error but don't fail the webhook
+                    // TODO: Add proper logging
+                    Console.WriteLine($"Failed to generate QR code: {ex.Message}");
+                }
             }
         }
     }
 
     // Request models
+    public class CreateCheckoutSessionRequest
+    {
+        public Guid TicketId { get; set; }
+    }
+
+    public class CreatePaymentIntentRequest
+    {
+        public Guid TicketId { get; set; }
+    }
+
     public class ProcessPaymentRequest
     {
         public Guid TicketId { get; set; }

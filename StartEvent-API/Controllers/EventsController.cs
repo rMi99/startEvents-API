@@ -43,7 +43,7 @@ namespace StartEvent_API.Controllers
                 Description = e.Description,
                 EventDate = e.EventDate,
                 VenueId = e.VenueId,
-                VenueName = e.Venue != null ? e.Venue.Name : null
+                VenueName = e.Venue != null ? e.Venue.Name ?? string.Empty : string.Empty
             }).ToList();
             return Ok(eventDtos);
         }

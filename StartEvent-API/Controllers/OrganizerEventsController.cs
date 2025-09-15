@@ -36,7 +36,7 @@ namespace StartEvent_API.Controllers
                 Description = e.Description,
                 EventDate = e.EventDate,
                 VenueId = e.VenueId,
-                VenueName = e.Venue != null ? e.Venue.Name : null
+                VenueName = e.Venue != null ? e.Venue.Name ?? string.Empty : string.Empty
             }).ToList();
             return Ok(eventDtos);
         }
@@ -101,7 +101,7 @@ namespace StartEvent_API.Controllers
                 Description = newEvent.Description,
                 EventDate = newEvent.EventDate,
                 VenueId = newEvent.VenueId,
-                VenueName = null
+                VenueName = newEvent.Venue != null ? newEvent.Venue.Name ?? string.Empty : string.Empty
             };
 
             return CreatedAtAction(nameof(GetMyEvents), new { id = newEvent.Id }, eventDto);

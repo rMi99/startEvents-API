@@ -116,6 +116,7 @@ namespace StartEvent_API.Business
                 // In a stateless JWT implementation, logout is typically handled client-side
                 // by removing the token. However, you could implement token blacklisting here
                 // if needed for additional security.
+                await Task.CompletedTask;
                 return true;
             }
             catch
