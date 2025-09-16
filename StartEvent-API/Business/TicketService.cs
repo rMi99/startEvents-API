@@ -12,19 +12,22 @@ namespace StartEvent_API.Business
         private readonly IDiscountRepository _discountRepository;
         private readonly ILoyaltyPointRepository _loyaltyPointRepository;
         private readonly ApplicationDbContext _context;
+        private readonly IQrService _qrService; // Add this line
 
         public TicketService(
             ITicketRepository ticketRepository,
             IPaymentRepository paymentRepository,
             IDiscountRepository discountRepository,
             ILoyaltyPointRepository loyaltyPointRepository,
-            ApplicationDbContext context)
+            ApplicationDbContext context,
+            IQrService qrService)
         {
             _ticketRepository = ticketRepository;
             _paymentRepository = paymentRepository;
             _discountRepository = discountRepository;
             _loyaltyPointRepository = loyaltyPointRepository;
             _context = context;
+            _qrService = qrService; // Assign qrService
         }
 
         public async Task<Ticket?> GetTicketByIdAsync(Guid id)
@@ -142,18 +145,15 @@ namespace StartEvent_API.Business
             var ticket = await _ticketRepository.GetByIdAsync(ticketId);
             if (ticket == null) return string.Empty;
 
-            // In a real implementation, you would generate an actual QR code image
-            // For now, we'll return a placeholder path
-            var qrCodePath = $"qrcodes/{ticket.TicketCode}.png";
-            
-            // TODO: Implement actual QR code generation using a library like QRCoder
-            // var qrGenerator = new QRCodeGenerator();
-            // var qrCodeData = qrGenerator.CreateQrCode(ticket.TicketCode, QRCodeGenerator.ECCLevel.Q);
-            // var qrCode = new QRCode(qrCodeData);
-            // var qrCodeImage = qrCode.GetGraphic(20);
-            // Save to file system or cloud storage
+            // Use the QrService to generate the QR code
+            var result = await _qrService.GenerateQrCodeAsync(ticket.Id, ticket.CustomerId);
 
-            return qrCodePath;
+            if (result.Success && !string.IsNullOrEmpty(result.QrCodePath))
+            {
+                return result.QrCodePath;
+            }
+            
+            return string.Empty; // Return empty string if QR code generation failed
         }
 
         public async Task<bool> ValidateTicketAsync(string ticketCode)

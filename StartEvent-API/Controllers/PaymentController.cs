@@ -32,6 +32,129 @@ namespace StartEvent_API.Controllers
         }
 
         /// <summary>
+        /// Force QR generation for a paid ticket (useful for fixing missing QR codes)
+        /// </summary>
+        [HttpPost("force-qr-generation")]
+        [Authorize(Roles = "Customer,Admin,Organizer")]
+        public async Task<IActionResult> ForceQrGeneration([FromBody] MarkPaidRequest request)
+        {
+            try
+            {
+                var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                if (string.IsNullOrEmpty(userId))
+                    return Unauthorized(new { Message = "User not authenticated" });
+
+                var ticket = await _ticketRepository.GetByIdAsync(request.TicketId);
+                if (ticket == null)
+                    return NotFound(new { Message = "Ticket not found" });
+
+                // Customers can only generate QR for their own ticket; Admin/Organizer can override
+                var userIsPrivileged = User.IsInRole("Admin") || User.IsInRole("Organizer");
+                if (!userIsPrivileged && ticket.CustomerId != userId)
+                    return StatusCode(403, new { Message = "Access denied" });
+
+                if (!ticket.IsPaid)
+                    return BadRequest(new { Message = "Ticket must be paid before generating QR code" });
+
+                var qrResult = await _qrService.GenerateQrCodeAsync(ticket.Id, ticket.CustomerId);
+                
+                if (qrResult.Success)
+                {
+                    return Ok(new
+                    {
+                        Success = true,
+                        Message = "QR code generated successfully",
+                        TicketId = ticket.Id,
+                        TicketCode = qrResult.TicketCode,
+                        QrCodePath = qrResult.QrCodePath
+                    });
+                }
+                else
+                {
+                    return BadRequest(new
+                    {
+                        Success = false,
+                        Message = qrResult.Message,
+                        Errors = qrResult.Errors
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { Success = false, Message = "Failed to generate QR code", Error = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// Manually mark a ticket as paid and trigger QR generation
+        /// </summary>
+        [HttpPost("mark-paid")]
+        [Authorize(Roles = "Customer,Admin,Organizer")]
+        public async Task<IActionResult> MarkPaid([FromBody] MarkPaidRequest request)
+        {
+            try
+            {
+                var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                if (string.IsNullOrEmpty(userId))
+                    return Unauthorized(new { Message = "User not authenticated" });
+
+                var ticket = await _ticketRepository.GetByIdAsync(request.TicketId);
+                if (ticket == null)
+                    return NotFound(new { Message = "Ticket not found" });
+
+                // Customers can only mark their own ticket; Admin/Organizer can override
+                var userIsPrivileged = User.IsInRole("Admin") || User.IsInRole("Organizer");
+                if (!userIsPrivileged && ticket.CustomerId != userId)
+                    return StatusCode(403, new { Message = "Access denied" });
+
+                if (!ticket.IsPaid)
+                {
+                    ticket.IsPaid = true;
+                    await _ticketRepository.UpdateAsync(ticket);
+
+                    // Create a payment record if one does not already exist
+                    var payments = await _paymentRepository.GetByTicketIdAsync(ticket.Id);
+                    if (!payments.Any())
+                    {
+                        var payment = new Data.Entities.Payment
+                        {
+                            Id = Guid.NewGuid(),
+                            CustomerId = ticket.CustomerId,
+                            TicketId = ticket.Id,
+                            Amount = ticket.TotalAmount,
+                            PaymentDate = DateTime.UtcNow,
+                            Status = "Completed",
+                            PaymentMethod = "Manual",
+                            TransactionId = null
+                        };
+                        await _paymentRepository.CreateAsync(payment);
+                    }
+
+                    try
+                    {
+                        await _qrService.GenerateQrCodeAsync(ticket.Id, ticket.CustomerId);
+                    }
+                    catch (Exception ex)
+                    {
+                        // QR generation failure should not fail status update
+                        Console.WriteLine($"QR generation failed in MarkPaid: {ex.Message}");
+                    }
+                }
+
+                return Ok(new
+                {
+                    Success = true,
+                    TicketId = ticket.Id,
+                    IsPaid = ticket.IsPaid
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { Success = false, Message = "Failed to mark ticket as paid", Error = ex.Message });
+            }
+        }
+
+        /// <summary>
         /// Creates a Stripe Checkout session for a ticket
         /// </summary>
         [HttpPost("create-checkout-session")]
@@ -161,7 +284,8 @@ namespace StartEvent_API.Controllers
                 PaymentStatus = payment?.Status ?? "Pending",
                 PaymentDate = payment?.PaymentDate,
                 Amount = ticket.TotalAmount,
-                HasQrCode = !string.IsNullOrEmpty(ticket.QrCodePath)
+                HasQrCode = !string.IsNullOrEmpty(ticket.QrCodePath),
+                QrCodePath = ticket.QrCodePath // Add this line
             });
         }
 
@@ -257,13 +381,28 @@ namespace StartEvent_API.Controllers
                 // Generate QR code automatically after successful payment
                 try
                 {
-                    await _qrService.GenerateQrCodeAsync(ticket.Id, ticket.CustomerId);
+                    var qrResult = await _qrService.GenerateQrCodeAsync(ticket.Id, ticket.CustomerId);
+                    if (!qrResult.Success)
+                    {
+                        Console.WriteLine($"QR generation failed for ticket {ticketId}: {qrResult.Message}");
+                        if (qrResult.Errors != null)
+                        {
+                            foreach (var error in qrResult.Errors)
+                            {
+                                Console.WriteLine($"QR Error: {error}");
+                            }
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine($"QR code generated successfully for ticket {ticketId}, code: {qrResult.TicketCode}");
+                    }
                 }
                 catch (Exception ex)
                 {
                     // Log the error but don't fail the webhook
-                    // TODO: Add proper logging
-                    Console.WriteLine($"Failed to generate QR code: {ex.Message}");
+                    Console.WriteLine($"Exception during QR generation for ticket {ticketId}: {ex.Message}");
+                    Console.WriteLine($"Stack trace: {ex.StackTrace}");
                 }
             }
         }
@@ -285,5 +424,10 @@ namespace StartEvent_API.Controllers
         public Guid TicketId { get; set; }
         public string PaymentMethod { get; set; } = "Card";
         public string? StripeToken { get; set; } // For Stripe integration
+    }
+
+    public class MarkPaidRequest
+    {
+        public Guid TicketId { get; set; }
     }
 }
