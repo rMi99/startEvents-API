@@ -14,7 +14,8 @@ namespace StartEvent_API.Controllers
     {
         private readonly ITicketService _ticketService;
 
-        public TicketsController(ITicketService ticketService)
+        public TicketsController(
+            ITicketService ticketService)
         {
             _ticketService = ticketService;
         }
@@ -94,7 +95,22 @@ namespace StartEvent_API.Controllers
                 if (ticket.CustomerId != customerId)
                     return Forbid("You can only view your own tickets");
 
-                return Ok(new { Success = true, Data = ticket });
+                var ticketDto = new TicketDto
+                {
+                    Id = ticket.Id,
+                    CustomerId = ticket.CustomerId,
+                    EventId = ticket.EventId,
+                    EventPriceId = ticket.EventPriceId,
+                    TicketNumber = ticket.TicketNumber,
+                    TicketCode = ticket.TicketCode,
+                    Quantity = ticket.Quantity,
+                    TotalAmount = ticket.TotalAmount,
+                    PurchaseDate = ticket.PurchaseDate,
+                    IsPaid = ticket.IsPaid,
+                    QrCodePath = ticket.QrCodePath
+                };
+
+                return Ok(new { Success = true, Data = ticketDto });
             }
             catch (Exception ex)
             {
