@@ -142,5 +142,30 @@ namespace StartEvent_API.Controllers
 
             return Ok(frontendEventDto);
         }
+
+        /// <summary>
+        /// Gets all unique event categories from available events - public endpoint
+        /// </summary>
+        /// <returns>List of unique event categories</returns>
+        // GET: api/events/categories
+        [HttpGet("categories")]
+        public async Task<IActionResult> GetEventCategories()
+        {
+            try
+            {
+                var categories = await _context.Events
+                    .Where(e => !string.IsNullOrEmpty(e.Category) && e.IsPublished) // Only published events with categories
+                    .Select(e => e.Category)
+                    .Distinct()
+                    .OrderBy(c => c)
+                    .ToListAsync();
+
+                return Ok(categories);
+            }
+            catch (Exception)
+            {
+                return StatusCode(500, "An error occurred while retrieving event categories");
+            }
+        }
     }
 }
