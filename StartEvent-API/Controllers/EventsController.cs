@@ -27,11 +27,12 @@ namespace StartEvent_API.Controllers
         /// <param name="toDate">Filter events up to this date</param>
         /// <param name="venue">Filter by venue name (partial match)</param>
         /// <param name="venueId">Filter by specific venue ID</param>
+        /// <param name="category">Filter by event category (case-insensitive exact match)</param>
         /// <param name="keyword">Search in event title or description</param>
         /// <returns>List of upcoming events matching the criteria</returns>
         // GET: api/events
         [HttpGet]
-        public async Task<IActionResult> GetUpcomingEvents([FromQuery] DateTime? fromDate, [FromQuery] DateTime? toDate, [FromQuery] string? venue, [FromQuery] Guid? venueId, [FromQuery] string? keyword)
+        public async Task<IActionResult> GetUpcomingEvents([FromQuery] DateTime? fromDate, [FromQuery] DateTime? toDate, [FromQuery] string? venue, [FromQuery] Guid? venueId, [FromQuery] string? category, [FromQuery] string? keyword)
         {
             var query = _context.Events.AsQueryable();
 
@@ -46,6 +47,8 @@ namespace StartEvent_API.Controllers
                 query = query.Where(e => e.Venue.Name.Contains(venue));
             if (venueId.HasValue)
                 query = query.Where(e => e.VenueId == venueId.Value);
+            if (!string.IsNullOrEmpty(category))
+                query = query.Where(e => EF.Functions.Like(e.Category.ToLower(), category.ToLower()));
             if (!string.IsNullOrEmpty(keyword))
                 query = query.Where(e => e.Title.Contains(keyword) || e.Description.Contains(keyword));
 
