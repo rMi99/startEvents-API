@@ -52,7 +52,7 @@ namespace StartEvent_API.Controllers
                 query = query.Where(e => e.EventDate <= toDate.Value);
 
             if (!string.IsNullOrEmpty(category))
-                query = query.Where(e => e.Category.Contains(category));
+                query = query.Where(e => EF.Functions.Like(e.Category.ToLower(), category.ToLower()));
 
             if (!string.IsNullOrEmpty(venue))
                 query = query.Where(e => e.Venue.Name.Contains(venue));
