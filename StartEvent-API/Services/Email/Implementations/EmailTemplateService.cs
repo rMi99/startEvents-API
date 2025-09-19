@@ -630,23 +630,24 @@ namespace StartEvent_API.Services.Email.Implementations
             
             <p>Hi {template.User.FullName ?? template.To.Name},</p>
             
-            <p>Thank you for signing up with {_emailConfig.Templates.Brand.CompanyName}! To complete your registration, please verify your email address.</p>
+            <p>Thank you for signing up with {_emailConfig.Templates.Brand.CompanyName}! To complete your registration, please verify your email address using the verification code below:</p>
+            
+            {(!string.IsNullOrEmpty(template.VerificationCode) ? $@"
+            <div class='verification-code' style='text-align: center; margin: 30px 0;'>
+                <p style='font-size: 16px; margin-bottom: 20px; color: #666;'>Your verification code:</p>
+                <div style='font-size: 32px; font-weight: bold; text-align: center; padding: 25px; background-color: #f8f9fa; border: 2px dashed #007bff; border-radius: 12px; letter-spacing: 8px; color: #007bff; font-family: monospace;'>{template.VerificationCode}</div>
+                <p style='font-size: 14px; margin-top: 15px; color: #666;'>Enter this 6-digit code in the verification form</p>
+            </div>" : "")}
             
             {(!string.IsNullOrEmpty(template.VerificationLink) ? $@"
             <div class='cta-section'>
                 <a href='{template.VerificationLink}' class='btn btn-primary'>Verify Email Address</a>
             </div>
             
-            <p>If the button above doesn't work, copy and paste this link into your browser:</p>
-            <p style='word-break: break-all; font-family: monospace; background-color: #f8f9fa; padding: 10px; border-radius: 4px;'>{template.VerificationLink}</p>" : "")}
+            <p style='font-size: 14px; color: #666;'>If the button above doesn't work, copy and paste this link into your browser:</p>
+            <p style='word-break: break-all; font-family: monospace; background-color: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 12px;'>{template.VerificationLink}</p>" : "")}
             
-            {(!string.IsNullOrEmpty(template.VerificationCode) ? $@"
-            <div class='verification-code'>
-                <p>Alternatively, you can enter this verification code:</p>
-                <div style='font-size: 24px; font-weight: bold; text-align: center; padding: 20px; background-color: #f8f9fa; border-radius: 8px; letter-spacing: 3px;'>{template.VerificationCode}</div>
-            </div>" : "")}
-            
-            <p>This verification link will expire in 24 hours for security reasons.</p>
+            <p><strong>Important:</strong> This verification code will expire in 15 minutes for security reasons.</p>
             
             <p>If you didn't create an account with us, you can safely ignore this email.</p>
             
@@ -965,22 +966,22 @@ namespace StartEvent_API.Services.Email.Implementations
             sb.AppendLine($"Thank you for signing up with {_emailConfig.Templates.Brand.CompanyName}! To complete your registration, please verify your email address.");
             sb.AppendLine();
 
+            if (!string.IsNullOrEmpty(template.VerificationCode))
+            {
+                sb.AppendLine("Enter this 6-digit verification code:");
+                sb.AppendLine($"*** {template.VerificationCode} ***");
+                sb.AppendLine();
+                sb.AppendLine("This code will expire in 15 minutes for security reasons.");
+                sb.AppendLine();
+            }
+
             if (!string.IsNullOrEmpty(template.VerificationLink))
             {
-                sb.AppendLine("Click the link below to verify your email:");
+                sb.AppendLine("Or click the link below if you prefer:");
                 sb.AppendLine(template.VerificationLink);
                 sb.AppendLine();
             }
 
-            if (!string.IsNullOrEmpty(template.VerificationCode))
-            {
-                sb.AppendLine("Alternatively, you can enter this verification code:");
-                sb.AppendLine(template.VerificationCode);
-                sb.AppendLine();
-            }
-
-            sb.AppendLine("This verification link will expire in 24 hours for security reasons.");
-            sb.AppendLine();
             sb.AppendLine("If you didn't create an account with us, you can safely ignore this email.");
             sb.AppendLine();
             sb.AppendLine("Best regards,");

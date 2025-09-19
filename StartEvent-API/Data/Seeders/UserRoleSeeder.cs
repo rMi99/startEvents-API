@@ -51,6 +51,7 @@ namespace StartEvent_API.Data.Seeders
                         UserName = email,
                         Email = email,
                         EmailConfirmed = true,
+                        IsEmailVerified = true, // Pre-seeded users are automatically verified
                         FullName = fullName,
                         CreatedAt = DateTime.Now,
                         IsActive = true

@@ -38,14 +38,14 @@ namespace StartEvent_API.Data.Seeders
 
             // 2. GET EXISTING USERS (created by UserRoleSeeder) 
             var existingUsers = await context.Users.ToListAsync();
-            
+
             // Find existing users or create new ones if needed
             var customers = existingUsers.Where(u => u.Email != null && (u.Email.Contains("customer") || u.Email.Contains("user"))).Take(2).ToList();
             var organizers = existingUsers.Where(u => u.Email != null && (u.Email.Contains("organizer") || u.Email.Contains("admin"))).Take(2).ToList();
 
             // If we don't have enough existing users, we'll create additional sample users
             var passwordHasher = new PasswordHasher<ApplicationUser>();
-            
+
             if (customers.Count < 2)
             {
                 var additionalCustomers = new List<ApplicationUser>
@@ -58,6 +58,7 @@ namespace StartEvent_API.Data.Seeders
                         Email = "john.doe@email.com",
                         NormalizedEmail = "JOHN.DOE@EMAIL.COM",
                         EmailConfirmed = true,
+                        IsEmailVerified = true, // Pre-seeded users are automatically verified
                         FullName = "John Doe",
                         Address = "123 Main Street, Colombo",
                         DateOfBirth = new DateTime(1990, 5, 15),
@@ -77,6 +78,7 @@ namespace StartEvent_API.Data.Seeders
                         Email = "jane.smith@email.com",
                         NormalizedEmail = "JANE.SMITH@EMAIL.COM",
                         EmailConfirmed = true,
+                        IsEmailVerified = true, // Pre-seeded users are automatically verified
                         FullName = "Jane Smith",
                         Address = "456 Park Avenue, Kandy",
                         DateOfBirth = new DateTime(1985, 8, 22),
@@ -100,10 +102,10 @@ namespace StartEvent_API.Data.Seeders
                 customers.AddRange(additionalCustomers);
 
                 // Add user roles for new customers
-                var customerRoles = additionalCustomers.Select(u => new IdentityUserRole<string> 
-                { 
-                    UserId = u.Id, 
-                    RoleId = customerRole.Id 
+                var customerRoles = additionalCustomers.Select(u => new IdentityUserRole<string>
+                {
+                    UserId = u.Id,
+                    RoleId = customerRole.Id
                 }).ToList();
                 await context.UserRoles.AddRangeAsync(customerRoles);
             }
@@ -120,6 +122,7 @@ namespace StartEvent_API.Data.Seeders
                         Email = "events@musiccompany.com",
                         NormalizedEmail = "EVENTS@MUSICCOMPANY.COM",
                         EmailConfirmed = true,
+                        IsEmailVerified = true, // Pre-seeded users are automatically verified
                         FullName = "Music Events Manager",
                         OrganizationName = "Global Music Company",
                         OrganizationContact = "+94112345678",
@@ -140,6 +143,7 @@ namespace StartEvent_API.Data.Seeders
                         Email = "admin@techconf.com",
                         NormalizedEmail = "ADMIN@TECHCONF.COM",
                         EmailConfirmed = true,
+                        IsEmailVerified = true, // Pre-seeded users are automatically verified
                         FullName = "Tech Conference Admin",
                         OrganizationName = "Tech Innovations Ltd",
                         OrganizationContact = "+94113456789",
@@ -164,10 +168,10 @@ namespace StartEvent_API.Data.Seeders
                 organizers.AddRange(additionalOrganizers);
 
                 // Add user roles for new organizers
-                var organizerRoles = additionalOrganizers.Select(u => new IdentityUserRole<string> 
-                { 
-                    UserId = u.Id, 
-                    RoleId = organizerRole.Id 
+                var organizerRoles = additionalOrganizers.Select(u => new IdentityUserRole<string>
+                {
+                    UserId = u.Id,
+                    RoleId = organizerRole.Id
                 }).ToList();
                 await context.UserRoles.AddRangeAsync(organizerRoles);
             }

@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Identity;
 using StartEvent_API.Data.Entities;
 using StartEvent_API.Helper;
+using StartEvent_API.Models.Auth;
 using StartEvent_API.Models.Email;
 using StartEvent_API.Repositories;
 using StartEvent_API.Services.Email;
@@ -45,6 +46,7 @@ namespace StartEvent_API.Business
                 // Set additional properties
                 user.CreatedAt = DateTime.UtcNow;
                 user.IsActive = true;
+                user.IsEmailVerified = false; // Email verification required
 
                 var result = await _authRepository.CreateUserAsync(user, password);
 
@@ -75,6 +77,9 @@ namespace StartEvent_API.Business
                 // Send welcome email
                 await SendWelcomeEmailAsync(user);
 
+                // Generate and send email verification
+                await GenerateAndSendEmailVerificationAsync(user);
+
                 return user;
             }
             catch (Exception ex)
@@ -99,6 +104,12 @@ namespace StartEvent_API.Business
                 if (!user.IsActive)
                 {
                     return null;
+                }
+
+                // Check if email is verified
+                if (!user.IsEmailVerified)
+                {
+                    return null; // Email not verified, login blocked
                 }
 
                 // Verify password
@@ -171,5 +182,213 @@ namespace StartEvent_API.Business
                 _logger.LogError(ex, "Exception occurred while sending welcome email to {Email}", user.Email);
             }
         }
+
+        #region Email Verification
+
+        public async Task<EmailVerificationResponse> SendEmailVerificationAsync(SendEmailVerificationRequest request)
+        {
+            try
+            {
+                var user = await _authRepository.GetUserByEmailAsync(request.Email);
+                if (user == null)
+                {
+                    return new EmailVerificationResponse
+                    {
+                        Success = false,
+                        Message = "User not found"
+                    };
+                }
+
+                if (user.IsEmailVerified)
+                {
+                    return new EmailVerificationResponse
+                    {
+                        Success = false,
+                        Message = "Email already verified"
+                    };
+                }
+
+                await GenerateAndSendEmailVerificationAsync(user);
+
+                return new EmailVerificationResponse
+                {
+                    Success = true,
+                    Message = "Verification code sent successfully"
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error sending email verification to {Email}", request.Email);
+                return new EmailVerificationResponse
+                {
+                    Success = false,
+                    Message = "An error occurred while sending verification code"
+                };
+            }
+        }
+
+        public async Task<VerifyEmailResponse> VerifyEmailAsync(VerifyEmailRequest request)
+        {
+            try
+            {
+                var user = await _authRepository.GetUserByEmailAsync(request.Email);
+                if (user == null)
+                {
+                    return new VerifyEmailResponse
+                    {
+                        Success = false,
+                        Message = "User not found"
+                    };
+                }
+
+                if (user.IsEmailVerified)
+                {
+                    return new VerifyEmailResponse
+                    {
+                        Success = true,
+                        Message = "Email already verified"
+                    };
+                }
+
+                // Check if verification code exists and hasn't expired
+                if (string.IsNullOrEmpty(user.EmailVerificationCode))
+                {
+                    return new VerifyEmailResponse
+                    {
+                        Success = false,
+                        Message = "No verification code found. Please request a new one"
+                    };
+                }
+
+                if (user.EmailVerificationCodeExpiry == null || user.EmailVerificationCodeExpiry < DateTime.UtcNow)
+                {
+                    return new VerifyEmailResponse
+                    {
+                        Success = false,
+                        Message = "Verification code has expired. Please request a new one"
+                    };
+                }
+
+                // Check if the provided code matches
+                if (user.EmailVerificationCode != request.VerificationCode)
+                {
+                    return new VerifyEmailResponse
+                    {
+                        Success = false,
+                        Message = "Invalid verification code"
+                    };
+                }
+
+                // Mark email as verified and clear verification data
+                user.IsEmailVerified = true;
+                user.EmailVerificationCode = null;
+                user.EmailVerificationCodeExpiry = null;
+
+                await _authRepository.UpdateUserAsync(user);
+
+                _logger.LogInformation("Email verified successfully for user {Email}", user.Email);
+
+                return new VerifyEmailResponse
+                {
+                    Success = true,
+                    Message = "Email verified successfully"
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error verifying email for {Email}", request.Email);
+                return new VerifyEmailResponse
+                {
+                    Success = false,
+                    Message = "An error occurred while verifying email"
+                };
+            }
+        }
+
+        public async Task<ResendVerificationResponse> ResendEmailVerificationAsync(ResendEmailVerificationRequest request)
+        {
+            try
+            {
+                var user = await _authRepository.GetUserByEmailAsync(request.Email);
+                if (user == null)
+                {
+                    return new ResendVerificationResponse
+                    {
+                        Success = false,
+                        Message = "User not found"
+                    };
+                }
+
+                if (user.IsEmailVerified)
+                {
+                    return new ResendVerificationResponse
+                    {
+                        Success = false,
+                        Message = "Email already verified"
+                    };
+                }
+
+                await GenerateAndSendEmailVerificationAsync(user);
+
+                return new ResendVerificationResponse
+                {
+                    Success = true,
+                    Message = "New verification code sent successfully"
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error resending email verification to {Email}", request.Email);
+                return new ResendVerificationResponse
+                {
+                    Success = false,
+                    Message = "An error occurred while resending verification code"
+                };
+            }
+        }
+
+        private async Task GenerateAndSendEmailVerificationAsync(ApplicationUser user)
+        {
+            // Generate 6-digit verification code
+            var random = new Random();
+            var verificationCode = random.Next(100000, 999999).ToString();
+
+            // Set expiry time to 15 minutes from now
+            var expiryTime = DateTime.UtcNow.AddMinutes(15);
+
+            // Update user with verification code and expiry
+            user.EmailVerificationCode = verificationCode;
+            user.EmailVerificationCodeExpiry = expiryTime;
+
+            await _authRepository.UpdateUserAsync(user);
+
+            // Send verification email
+            var verificationEmail = new EmailVerificationEmailTemplate
+            {
+                To = new EmailRecipient
+                {
+                    Email = user.Email ?? string.Empty,
+                    Name = user.FullName ?? user.UserName ?? "User"
+                },
+                User = user,
+                Subject = "Verify Your Email Address",
+                VerificationCode = verificationCode,
+                VerificationLink = string.Empty // We're focusing on code verification, but link can be added if needed
+            };
+
+            var result = await _emailService.SendEmailVerificationEmailAsync(verificationEmail);
+
+            if (result.Success)
+            {
+                _logger.LogInformation("Email verification code sent successfully to {Email}", user.Email);
+            }
+            else
+            {
+                _logger.LogWarning("Failed to send email verification code to {Email}: {Error}",
+                    user.Email, result.ErrorMessage);
+            }
+        }
+
+        #endregion
     }
 }
