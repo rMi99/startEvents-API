@@ -179,6 +179,14 @@ namespace StartEvent_API.Controllers
             // Your frontend domain
             var domain = _configuration["FrontendDomain"] ?? "http://localhost:3000";
 
+            // Use the values from the request : ticket.TotalAmount
+            var unitAmount = request.UnitPrice; // Already in cents from frontend
+            var quantity = request.Quantity;
+            var ticketType = request.TicketType ?? ticket.Event.Title;
+
+            _logger.LogInformation("Creating Stripe checkout session: UnitPrice={UnitPrice} cents, Quantity={Quantity}, Total={Total} cents", 
+                unitAmount, quantity, unitAmount * quantity);
+
             var options = new SessionCreateOptions
             {
                 PaymentMethodTypes = new List<string> { "card" },
@@ -188,15 +196,15 @@ namespace StartEvent_API.Controllers
                     {
                         PriceData = new SessionLineItemPriceDataOptions
                         {
-                            UnitAmount = (long)(ticket.TotalAmount * 100), // Amount in cents
+                            UnitAmount = unitAmount, // Use the unitPrice from frontend (already in cents)
                             Currency = "lkr",
                             ProductData = new SessionLineItemPriceDataProductDataOptions
                             {
-                                Name = ticket.Event.Title,
-                                Description = $"Ticket(s) for {ticket.Event.Title}",
+                                Name = ticketType,
+                                Description = $"{quantity} ticket(s) for {ticket.Event.Title}",
                             },
                         },
-                        Quantity = ticket.Quantity,
+                        Quantity = quantity, // Use quantity from frontend
                     },
                 },
                 Mode = "payment",
@@ -209,6 +217,9 @@ namespace StartEvent_API.Controllers
 
             var service = new SessionService();
             Session session = await service.CreateAsync(options);
+
+            _logger.LogInformation("Stripe checkout session created: {SessionId}, Total amount: {Total} cents", 
+                session.Id, unitAmount * quantity);
 
             return Ok(new { url = session.Url });
         }
@@ -497,6 +508,9 @@ namespace StartEvent_API.Controllers
     public class CreateCheckoutSessionRequest
     {
         public Guid TicketId { get; set; }
+        public string? TicketType { get; set; }
+        public long UnitPrice { get; set; } // Price in cents
+        public int Quantity { get; set; }
     }
 
     public class CreatePaymentIntentRequest
