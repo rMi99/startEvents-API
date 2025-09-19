@@ -19,6 +19,11 @@ namespace StartEvent_API.Business
         Task<bool> UpdateUserNameAsync(string userId, string newFullName);
         Task<ResetPasswordResponse> InitiatePasswordResetAsync(string email);
         Task<bool> ConfirmPasswordResetAsync(string email, string resetToken, string newPassword);
+
+        // OTP-based Password Reset Methods
+        Task<ForgotPasswordResponse> SendPasswordResetOtpAsync(string email);
+        Task<VerifyPasswordResetOtpResponse> VerifyPasswordResetOtpAsync(string email, string otp);
+        Task<bool> ResetPasswordWithOtpAsync(string email, string resetToken, string newPassword);
     }
 }
 

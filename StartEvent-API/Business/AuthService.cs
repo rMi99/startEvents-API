@@ -599,6 +599,236 @@ namespace StartEvent_API.Business
             }
         }
 
+        #region OTP-based Password Reset
+
+        public async Task<ForgotPasswordResponse> SendPasswordResetOtpAsync(string email)
+        {
+            try
+            {
+                var user = await _userManager.FindByEmailAsync(email);
+                if (user == null)
+                {
+                    // For security reasons, don't reveal whether the email exists
+                    _logger.LogWarning("Password reset OTP requested for non-existent email: {Email}", email);
+                    return new ForgotPasswordResponse
+                    {
+                        Success = true,
+                        Message = "If the email address exists in our system, you will receive an OTP to reset your password."
+                    };
+                }
+
+                // Rate limiting: Allow only 5 attempts per hour
+                var now = DateTime.UtcNow;
+                if (user.PasswordResetLastAttempt.HasValue &&
+                    now.Subtract(user.PasswordResetLastAttempt.Value).TotalHours < 1 &&
+                    user.PasswordResetAttempts >= 5)
+                {
+                    _logger.LogWarning("Password reset rate limit exceeded for user: {Email}", email);
+                    return new ForgotPasswordResponse
+                    {
+                        Success = false,
+                        Message = "Too many password reset attempts. Please try again after 1 hour.",
+                        RemainingAttempts = 0
+                    };
+                }
+
+                // Reset attempts counter if more than 1 hour has passed
+                if (!user.PasswordResetLastAttempt.HasValue ||
+                    now.Subtract(user.PasswordResetLastAttempt.Value).TotalHours >= 1)
+                {
+                    user.PasswordResetAttempts = 0;
+                }
+
+                // Generate 6-digit OTP
+                var random = new Random();
+                var otp = random.Next(100000, 999999).ToString();
+
+                // Set OTP expiry to 15 minutes from now
+                var expiryTime = now.AddMinutes(15);
+
+                // Update user with OTP details
+                user.PasswordResetOtp = otp;
+                user.PasswordResetOtpExpiry = expiryTime;
+                user.PasswordResetAttempts++;
+                user.PasswordResetLastAttempt = now;
+
+                await _userManager.UpdateAsync(user);
+
+                // Send OTP via email (reuse the email verification template structure)
+                var resetOtpEmail = new EmailVerificationEmailTemplate
+                {
+                    To = new EmailRecipient
+                    {
+                        Email = user.Email ?? string.Empty,
+                        Name = user.FullName ?? user.UserName ?? "User"
+                    },
+                    User = user,
+                    Subject = "Password Reset OTP",
+                    VerificationCode = otp,
+                    VerificationLink = string.Empty
+                };
+
+                var result = await _emailService.SendEmailVerificationEmailAsync(resetOtpEmail);
+
+                if (result.Success)
+                {
+                    _logger.LogInformation("Password reset OTP sent successfully to {Email}", email);
+                    return new ForgotPasswordResponse
+                    {
+                        Success = true,
+                        Message = "An OTP has been sent to your email address. Please check your email and enter the OTP to continue with password reset.",
+                        ExpiresAt = expiryTime,
+                        RemainingAttempts = Math.Max(0, 5 - user.PasswordResetAttempts)
+                    };
+                }
+                else
+                {
+                    _logger.LogWarning("Failed to send password reset OTP to {Email}: {Error}", email, result.ErrorMessage);
+                    return new ForgotPasswordResponse
+                    {
+                        Success = false,
+                        Message = "Failed to send OTP. Please try again later."
+                    };
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error occurred while sending password reset OTP for email: {Email}", email);
+                return new ForgotPasswordResponse
+                {
+                    Success = false,
+                    Message = "An error occurred while processing your request. Please try again later."
+                };
+            }
+        }
+
+        public async Task<VerifyPasswordResetOtpResponse> VerifyPasswordResetOtpAsync(string email, string otp)
+        {
+            try
+            {
+                var user = await _userManager.FindByEmailAsync(email);
+                if (user == null)
+                {
+                    _logger.LogWarning("Password reset OTP verification attempted for non-existent email: {Email}", email);
+                    return new VerifyPasswordResetOtpResponse
+                    {
+                        Success = false,
+                        Message = "Invalid email or OTP."
+                    };
+                }
+
+                // Check if OTP exists and hasn't expired
+                if (string.IsNullOrEmpty(user.PasswordResetOtp) ||
+                    !user.PasswordResetOtpExpiry.HasValue ||
+                    DateTime.UtcNow > user.PasswordResetOtpExpiry.Value)
+                {
+                    _logger.LogWarning("Expired or missing password reset OTP for user: {Email}", email);
+                    return new VerifyPasswordResetOtpResponse
+                    {
+                        Success = false,
+                        Message = "OTP has expired or is invalid. Please request a new one."
+                    };
+                }
+
+                // Verify OTP
+                if (user.PasswordResetOtp != otp)
+                {
+                    _logger.LogWarning("Invalid password reset OTP provided for user: {Email}", email);
+                    return new VerifyPasswordResetOtpResponse
+                    {
+                        Success = false,
+                        Message = "Invalid OTP. Please check and try again."
+                    };
+                }
+
+                // OTP is valid, generate reset token
+                var resetToken = Guid.NewGuid().ToString();
+                var tokenExpiry = DateTime.UtcNow.AddMinutes(30); // 30 minutes to reset password
+
+                // Update user with reset token
+                user.PasswordResetToken = resetToken;
+                user.PasswordResetTokenExpiry = tokenExpiry;
+                user.PasswordResetOtp = null; // Clear the OTP as it's been used
+                user.PasswordResetOtpExpiry = null;
+
+                await _userManager.UpdateAsync(user);
+
+                _logger.LogInformation("Password reset OTP verified successfully for user: {Email}", email);
+
+                return new VerifyPasswordResetOtpResponse
+                {
+                    Success = true,
+                    Message = "OTP verified successfully. You can now reset your password.",
+                    ResetToken = resetToken
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error occurred while verifying password reset OTP for email: {Email}", email);
+                return new VerifyPasswordResetOtpResponse
+                {
+                    Success = false,
+                    Message = "An error occurred while processing your request. Please try again later."
+                };
+            }
+        }
+
+        public async Task<bool> ResetPasswordWithOtpAsync(string email, string resetToken, string newPassword)
+        {
+            try
+            {
+                var user = await _userManager.FindByEmailAsync(email);
+                if (user == null)
+                {
+                    _logger.LogWarning("Password reset with OTP attempted for non-existent email: {Email}", email);
+                    return false;
+                }
+
+                // Check if reset token exists and hasn't expired
+                if (string.IsNullOrEmpty(user.PasswordResetToken) ||
+                    user.PasswordResetToken != resetToken ||
+                    !user.PasswordResetTokenExpiry.HasValue ||
+                    DateTime.UtcNow > user.PasswordResetTokenExpiry.Value)
+                {
+                    _logger.LogWarning("Invalid or expired password reset token for user: {Email}", email);
+                    return false;
+                }
+
+                // Generate password reset token for UserManager
+                var userManagerResetToken = await _userManager.GeneratePasswordResetTokenAsync(user);
+
+                // Reset the password using UserManager
+                var result = await _userManager.ResetPasswordAsync(user, userManagerResetToken, newPassword);
+
+                if (result.Succeeded)
+                {
+                    // Clear reset token and related fields
+                    user.PasswordResetToken = null;
+                    user.PasswordResetTokenExpiry = null;
+                    user.PasswordResetAttempts = 0;
+                    user.LastLogin = DateTime.UtcNow;
+
+                    await _userManager.UpdateAsync(user);
+
+                    _logger.LogInformation("Password reset successfully with OTP for user: {Email}", email);
+                    return true;
+                }
+                else
+                {
+                    var errors = string.Join(", ", result.Errors.Select(e => e.Description));
+                    _logger.LogWarning("Failed to reset password with OTP for user: {Email}. Errors: {Errors}", email, errors);
+                    return false;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error occurred while resetting password with OTP for email: {Email}", email);
+                return false;
+            }
+        }
+
+        #endregion
+
         #endregion
     }
 }

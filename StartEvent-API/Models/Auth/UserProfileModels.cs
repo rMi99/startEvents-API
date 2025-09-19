@@ -53,4 +53,57 @@ namespace StartEvent_API.Models.Auth
         [StringLength(100, MinimumLength = 6, ErrorMessage = "Password must be at least 6 characters long")]
         public string NewPassword { get; set; } = string.Empty;
     }
+
+    // OTP-based Password Reset Models
+    public class ForgotPasswordRequest
+    {
+        [Required(ErrorMessage = "Email is required")]
+        [EmailAddress(ErrorMessage = "Invalid email format")]
+        public string Email { get; set; } = string.Empty;
+    }
+
+    public class ForgotPasswordResponse
+    {
+        public string Message { get; set; } = string.Empty;
+        public bool Success { get; set; }
+        public DateTime? ExpiresAt { get; set; }
+        public int? RemainingAttempts { get; set; }
+    }
+
+    public class VerifyPasswordResetOtpRequest
+    {
+        [Required(ErrorMessage = "Email is required")]
+        [EmailAddress(ErrorMessage = "Invalid email format")]
+        public string Email { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "OTP is required")]
+        [StringLength(6, MinimumLength = 6, ErrorMessage = "OTP must be exactly 6 digits")]
+        [RegularExpression(@"^\d{6}$", ErrorMessage = "OTP must contain only digits")]
+        public string Otp { get; set; } = string.Empty;
+    }
+
+    public class VerifyPasswordResetOtpResponse
+    {
+        public string Message { get; set; } = string.Empty;
+        public bool Success { get; set; }
+        public string? ResetToken { get; set; } // Temporary token to allow password reset
+    }
+
+    public class ResetPasswordWithOtpRequest
+    {
+        [Required(ErrorMessage = "Email is required")]
+        [EmailAddress(ErrorMessage = "Invalid email format")]
+        public string Email { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Reset token is required")]
+        public string ResetToken { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "New password is required")]
+        [StringLength(100, MinimumLength = 6, ErrorMessage = "Password must be at least 6 characters long")]
+        public string NewPassword { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Confirm password is required")]
+        [Compare("NewPassword", ErrorMessage = "Passwords do not match")]
+        public string ConfirmPassword { get; set; } = string.Empty;
+    }
 }
