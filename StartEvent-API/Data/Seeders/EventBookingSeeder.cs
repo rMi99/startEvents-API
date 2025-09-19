@@ -235,19 +235,20 @@ namespace StartEvent_API.Data.Seeders
             // 10. EVENT PRICES
             var eventPrices = new List<EventPrice>
             {
-                // Music Concert prices
-                new EventPrice { Id = Guid.NewGuid(), EventId = events[0].Id, Category = "VIP", Stock = 50, IsActive = true, Price = 150m },
-                new EventPrice { Id = Guid.NewGuid(), EventId = events[0].Id, Category = "General", Stock = 200, IsActive = true, Price = 50m },
-                new EventPrice { Id = Guid.NewGuid(), EventId = events[0].Id, Category = "Student", Stock = 100, IsActive = true, Price = 25m },
-                
-                // Tech Conference prices
-                new EventPrice { Id = Guid.NewGuid(), EventId = events[1].Id, Category = "Standard", Stock = 300, IsActive = true, Price = 100m },
-                new EventPrice { Id = Guid.NewGuid(), EventId = events[1].Id, Category = "Premium", Stock = 50, IsActive = true, Price = 200m },
-                
-                // Art Exhibition prices
-                new EventPrice { Id = Guid.NewGuid(), EventId = events[2].Id, Category = "Adult", Stock = 150, IsActive = true, Price = 30m },
-                new EventPrice { Id = Guid.NewGuid(), EventId = events[2].Id, Category = "Student", Stock = 100, IsActive = true, Price = 15m }
+                // Music Concert prices (High-end event)
+                new EventPrice { Id = Guid.NewGuid(), EventId = events[0].Id, Category = "VIP", Stock = 50, IsActive = true, Price = 7500m },
+                new EventPrice { Id = Guid.NewGuid(), EventId = events[0].Id, Category = "General", Stock = 200, IsActive = true, Price = 2500m },
+                new EventPrice { Id = Guid.NewGuid(), EventId = events[0].Id, Category = "Student", Stock = 100, IsActive = true, Price = 2000m },
+
+                // Tech Conference prices (Executive-level access)
+                new EventPrice { Id = Guid.NewGuid(), EventId = events[1].Id, Category = "Standard", Stock = 300, IsActive = true, Price = 3000m },
+                new EventPrice { Id = Guid.NewGuid(), EventId = events[1].Id, Category = "Premium", Stock = 50, IsActive = true, Price = 10000m },
+
+                // Art Exhibition prices (Luxury private viewing)
+                new EventPrice { Id = Guid.NewGuid(), EventId = events[2].Id, Category = "Adult", Stock = 150, IsActive = true, Price = 2500m },
+                new EventPrice { Id = Guid.NewGuid(), EventId = events[2].Id, Category = "Student", Stock = 100, IsActive = true, Price = 2000m }
             };
+
             await context.EventPrices.AddRangeAsync(eventPrices);
 
             // 11. DISCOUNTS
