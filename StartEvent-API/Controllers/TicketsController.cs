@@ -133,9 +133,52 @@ namespace StartEvent_API.Controllers
 
                 var tickets = await _ticketService.GetCustomerTicketsAsync(customerId, page, pageSize);
 
+                // Map to DTOs to avoid circular references
+                var ticketDtos = tickets.Select(ticket => new TicketHistoryDto
+                {
+                    Id = ticket.Id,
+                    CustomerId = ticket.CustomerId,
+                    EventId = ticket.EventId,
+                    EventPriceId = ticket.EventPriceId,
+                    TicketNumber = ticket.TicketNumber,
+                    TicketCode = ticket.TicketCode,
+                    Quantity = ticket.Quantity,
+                    TotalAmount = ticket.TotalAmount,
+                    PurchaseDate = ticket.PurchaseDate,
+                    IsPaid = ticket.IsPaid,
+                    QrCodePath = ticket.QrCodePath,
+                    Event = ticket.Event != null ? new EventSummaryDto
+                    {
+                        Id = ticket.Event.Id,
+                        Title = ticket.Event.Title,
+                        Description = ticket.Event.Description,
+                        EventDate = ticket.Event.EventDate,
+                        EventTime = ticket.Event.EventTime.ToString("HH:mm"),
+                        Category = ticket.Event.Category,
+                        Image = ticket.Event.Image,
+                        ImageUrl = ticket.Event.Image, // Use Image property for both
+                        IsPublished = ticket.Event.IsPublished,
+                        Venue = ticket.Event.Venue != null ? new VenueSummaryDto
+                        {
+                            Id = ticket.Event.Venue.Id,
+                            Name = ticket.Event.Venue.Name,
+                            Location = ticket.Event.Venue.Location,
+                            Capacity = ticket.Event.Venue.Capacity
+                        } : null
+                    } : null,
+                    EventPrice = ticket.EventPrice != null ? new EventPriceSummaryDto
+                    {
+                        Id = ticket.EventPrice.Id,
+                        Category = ticket.EventPrice.Category,
+                        Price = ticket.EventPrice.Price,
+                        Stock = ticket.EventPrice.Stock,
+                        IsActive = ticket.EventPrice.IsActive
+                    } : null
+                }).ToList();
+
                 return Ok(new { 
                     Success = true, 
-                    Data = tickets,
+                    Data = ticketDtos,
                     Page = page,
                     PageSize = pageSize
                 });
