@@ -415,6 +415,156 @@ namespace StartEvent_API.Controllers
                 });
             }
         }
+        /// <summary>
+        /// Creates a new admin user. Only accessible by existing admin users.
+        /// </summary>
+        [HttpPost("create-admin")]
+        [Authorize(Roles = "Admin")]
+        [ProducesResponseType(200, Type = typeof(object))]
+        [ProducesResponseType(400)]
+        [ProducesResponseType(401)]
+        [ProducesResponseType(409)]
+        [ProducesResponseType(500)]
+        public async Task<IActionResult> CreateAdminUser([FromBody] CreateAdminRequest request)
+        {
+            try
+            {
+                if (!ModelState.IsValid)
+                {
+                    return BadRequest(new
+                    {
+                        message = "Validation failed",
+                        errors = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage),
+                        statusCode = 400
+                    });
+                }
+
+                // Check if user already exists
+                var existingUser = await _userManager.FindByEmailAsync(request.Email);
+                if (existingUser != null)
+                {
+                    return Conflict(new
+                    {
+                        message = "User already exists",
+                        error = $"A user with email '{request.Email}' already exists",
+                        statusCode = 409
+                    });
+                }
+
+                var newAdminUser = new ApplicationUser
+                {
+                    UserName = request.Email,
+                    Email = request.Email,
+                    FullName = request.FullName,
+                    Address = request.Address,
+                    DateOfBirth = request.DateOfBirth,
+                    OrganizationName = request.OrganizationName,
+                    OrganizationContact = request.OrganizationContact,
+                    EmailConfirmed = true
+                };
+
+                var createdUser = await _authService.CreateAdminUserAsync(newAdminUser, request.Password);
+
+                if (createdUser == null)
+                {
+                    return StatusCode(500, new
+                    {
+                        message = "Admin user creation failed",
+                        error = "Unable to create admin user. Please try again.",
+                        statusCode = 500
+                    });
+                }
+
+                // Get the roles for the created user
+                var roles = await _userManager.GetRolesAsync(createdUser);
+                var token = _jwtService.GenerateToken(createdUser, roles);
+
+                return Ok(new
+                {
+                    message = "Admin user created successfully",
+                    data = new
+                    {
+                        user = new
+                        {
+                            id = createdUser.Id,
+                            email = createdUser.Email,
+                            fullName = createdUser.FullName,
+                            address = createdUser.Address,
+                            dateOfBirth = createdUser.DateOfBirth,
+                            organizationName = createdUser.OrganizationName,
+                            organizationContact = createdUser.OrganizationContact,
+                            assignedRole = "Admin",
+                            createdAt = createdUser.CreatedAt
+                        },
+                        roles
+                    },
+                    statusCode = 200
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    message = "Internal server error",
+                    error = "An unexpected error occurred during admin user creation",
+                    details = ex.Message,
+                    statusCode = 500
+                });
+            }
+        }
+
+        /// <summary>
+        /// Gets all admin users in the system. Only accessible by existing admin users.
+        /// </summary>
+        [HttpGet("admin-users")]
+        [Authorize(Roles = "Admin")]
+        [ProducesResponseType(200, Type = typeof(object))]
+        [ProducesResponseType(401)]
+        [ProducesResponseType(403)]
+        [ProducesResponseType(500)]
+        public async Task<IActionResult> GetAllAdminUsers()
+        {
+            try
+            {
+                var adminUsers = await _authService.GetAllAdminUsersAsync();
+
+                var adminUserDtos = adminUsers.Select(user => new
+                {
+                    id = user.Id,
+                    email = user.Email,
+                    fullName = user.FullName,
+                    address = user.Address,
+                    dateOfBirth = user.DateOfBirth,
+                    organizationName = user.OrganizationName,
+                    organizationContact = user.OrganizationContact,
+                    isActive = user.IsActive,
+                    emailConfirmed = user.EmailConfirmed,
+                    createdAt = user.CreatedAt,
+                    lastLogin = user.LastLogin
+                }).ToList();
+
+                return Ok(new
+                {
+                    message = "Admin users retrieved successfully",
+                    data = new
+                    {
+                        totalCount = adminUserDtos.Count,
+                        adminUsers = adminUserDtos
+                    },
+                    statusCode = 200
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    message = "Internal server error",
+                    error = "An unexpected error occurred while retrieving admin users",
+                    details = ex.Message,
+                    statusCode = 500
+                });
+            }
+        }
 
         #endregion
     }
@@ -454,4 +604,25 @@ namespace StartEvent_API.Controllers
         public string Email { get; set; } = string.Empty;
         public string Password { get; set; } = string.Empty;
     }
+
+
+    public class CreateAdminRequest
+    {
+        [Required(ErrorMessage = "Email is required")]
+        [EmailAddress(ErrorMessage = "Invalid email format")]
+        public string Email { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Password is required")]
+        [StringLength(100, MinimumLength = 8, ErrorMessage = "Password must be at least 8 characters long")]
+        public string Password { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Full name is required")]
+        public string FullName { get; set; } = string.Empty;
+
+        public string? Address { get; set; }
+        public DateTime? DateOfBirth { get; set; }
+        public string? OrganizationName { get; set; }
+        public string? OrganizationContact { get; set; }
+    }
+
 }

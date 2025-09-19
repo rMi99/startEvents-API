@@ -13,6 +13,7 @@ namespace StartEvent_API.Repositories
         Task<IdentityResult> UpdateUserAsync(ApplicationUser user);
         Task<ApplicationUser?> GetUserByIdAsync(string userId);
         Task<bool> UserExistsAsync(string email);
+        Task<List<ApplicationUser>> GetUsersByRoleAsync(string role);
     }
 }
 
