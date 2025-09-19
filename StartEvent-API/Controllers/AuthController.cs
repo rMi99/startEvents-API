@@ -334,6 +334,59 @@ namespace StartEvent_API.Controllers
                 });
             }
         }
+
+        /// <summary>
+        /// Gets all admin users in the system. Only accessible by existing admin users.
+        /// </summary>
+        [HttpGet("admin-users")]
+        [Authorize(Roles = "Admin")]
+        [ProducesResponseType(200, Type = typeof(object))]
+        [ProducesResponseType(401)]
+        [ProducesResponseType(403)]
+        [ProducesResponseType(500)]
+        public async Task<IActionResult> GetAllAdminUsers()
+        {
+            try
+            {
+                var adminUsers = await _authService.GetAllAdminUsersAsync();
+
+                var adminUserDtos = adminUsers.Select(user => new
+                {
+                    id = user.Id,
+                    email = user.Email,
+                    fullName = user.FullName,
+                    address = user.Address,
+                    dateOfBirth = user.DateOfBirth,
+                    organizationName = user.OrganizationName,
+                    organizationContact = user.OrganizationContact,
+                    isActive = user.IsActive,
+                    emailConfirmed = user.EmailConfirmed,
+                    createdAt = user.CreatedAt,
+                    lastLogin = user.LastLogin
+                }).ToList();
+
+                return Ok(new
+                {
+                    message = "Admin users retrieved successfully",
+                    data = new
+                    {
+                        totalCount = adminUserDtos.Count,
+                        adminUsers = adminUserDtos
+                    },
+                    statusCode = 200
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    message = "Internal server error",
+                    error = "An unexpected error occurred while retrieving admin users",
+                    details = ex.Message,
+                    statusCode = 500
+                });
+            }
+        }
     }
 
     // Request models

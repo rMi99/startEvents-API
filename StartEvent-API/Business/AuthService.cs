@@ -179,6 +179,20 @@ namespace StartEvent_API.Business
             }
         }
 
+        public async Task<List<ApplicationUser>> GetAllAdminUsersAsync()
+        {
+            try
+            {
+                var adminUsers = await _authRepository.GetUsersByRoleAsync("Admin");
+                return adminUsers.OrderBy(u => u.CreatedAt).ToList();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving admin users");
+                return new List<ApplicationUser>();
+            }
+        }
+
         private async Task SendWelcomeEmailAsync(ApplicationUser user)
         {
             try

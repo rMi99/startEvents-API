@@ -52,6 +52,12 @@ namespace StartEvent_API.Repositories
             var user = await _userManager.FindByEmailAsync(email);
             return user != null;
         }
+
+        public async Task<List<ApplicationUser>> GetUsersByRoleAsync(string role)
+        {
+            var users = await _userManager.GetUsersInRoleAsync(role);
+            return users.ToList();
+        }
     }
 }
 

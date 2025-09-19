@@ -94,8 +94,8 @@ builder.Services.AddScoped<StartEvent_API.Repositories.IUserRepository, StartEve
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
-        // Handle circular references with Preserve handler
-        options.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.Preserve;
+        // Handle circular references without $id/$values wrappers
+        options.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
         // Set max depth to prevent infinite loops
         options.JsonSerializerOptions.MaxDepth = 64;
         // Optional: Use camelCase for property names

@@ -8,6 +8,7 @@ namespace StartEvent_API.Business
         Task<ApplicationUser?> LoginAsync(string email, string password);
         Task<bool> LogoutAsync(string userId);
         Task<ApplicationUser?> CreateAdminUserAsync(ApplicationUser user, string password);
+        Task<List<ApplicationUser>> GetAllAdminUsersAsync();
     }
 }
 
