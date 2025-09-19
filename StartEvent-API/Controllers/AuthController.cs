@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using StartEvent_API.Business;
 using StartEvent_API.Data.Entities;
 using StartEvent_API.Helper;
+using StartEvent_API.Models.Auth;
 using Microsoft.AspNetCore.Identity;
 using System.ComponentModel.DataAnnotations;
 
@@ -168,6 +169,20 @@ namespace StartEvent_API.Controllers
 
                 if (result == null)
                 {
+                    // Check if user exists but email is not verified
+                    var userCheck = await _userManager.FindByEmailAsync(request.Email);
+                    if (userCheck != null && !userCheck.IsEmailVerified)
+                    {
+                        return Unauthorized(new
+                        {
+                            message = "Email verification required",
+                            error = "Please verify your email address before logging in. Check your inbox for the verification code.",
+                            statusCode = 401,
+                            requiresEmailVerification = true,
+                            email = userCheck.Email
+                        });
+                    }
+
                     return Unauthorized(new
                     {
                         message = "Authentication failed",
@@ -237,88 +252,45 @@ namespace StartEvent_API.Controllers
             return Ok(new { message = "Logout successful", success = result });
         }
 
-        /// <summary>
-        /// Creates a new admin user. Only accessible by existing admin users.
-        /// </summary>
-        [HttpPost("create-admin")]
-        [Authorize(Roles = "Admin")]
-        [ProducesResponseType(200, Type = typeof(object))]
+        #region Email Verification Endpoints
+
+        [HttpPost("send-verification")]
+        [ProducesResponseType(200, Type = typeof(EmailVerificationResponse))]
         [ProducesResponseType(400)]
-        [ProducesResponseType(401)]
-        [ProducesResponseType(409)]
+        [ProducesResponseType(422)]
         [ProducesResponseType(500)]
-        public async Task<IActionResult> CreateAdminUser([FromBody] CreateAdminRequest request)
+        public async Task<IActionResult> SendEmailVerification([FromBody] SendEmailVerificationRequest request)
         {
             try
             {
                 if (!ModelState.IsValid)
                 {
-                    return BadRequest(new
+                    return UnprocessableEntity(new
                     {
                         message = "Validation failed",
-                        errors = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage),
+                        errors = ModelState.Values.SelectMany(v => v.Errors.Select(e => e.ErrorMessage)),
+                        statusCode = 422
+                    });
+                }
+
+                var result = await _authService.SendEmailVerificationAsync(request);
+
+                if (!result.Success)
+                {
+                    return BadRequest(new
+                    {
+                        message = result.Message,
                         statusCode = 400
                     });
                 }
 
-                // Check if user already exists
-                var existingUser = await _userManager.FindByEmailAsync(request.Email);
-                if (existingUser != null)
-                {
-                    return Conflict(new
-                    {
-                        message = "User already exists",
-                        error = $"A user with email '{request.Email}' already exists",
-                        statusCode = 409
-                    });
-                }
-
-                var newAdminUser = new ApplicationUser
-                {
-                    UserName = request.Email,
-                    Email = request.Email,
-                    FullName = request.FullName,
-                    Address = request.Address,
-                    DateOfBirth = request.DateOfBirth,
-                    OrganizationName = request.OrganizationName,
-                    OrganizationContact = request.OrganizationContact,
-                    EmailConfirmed = true
-                };
-
-                var createdUser = await _authService.CreateAdminUserAsync(newAdminUser, request.Password);
-
-                if (createdUser == null)
-                {
-                    return StatusCode(500, new
-                    {
-                        message = "Admin user creation failed",
-                        error = "Unable to create admin user. Please try again.",
-                        statusCode = 500
-                    });
-                }
-
-                // Get the roles for the created user
-                var roles = await _userManager.GetRolesAsync(createdUser);
-                var token = _jwtService.GenerateToken(createdUser, roles);
-
                 return Ok(new
                 {
-                    message = "Admin user created successfully",
+                    message = result.Message,
                     data = new
                     {
-                        user = new
-                        {
-                            id = createdUser.Id,
-                            email = createdUser.Email,
-                            fullName = createdUser.FullName,
-                            address = createdUser.Address,
-                            dateOfBirth = createdUser.DateOfBirth,
-                            organizationName = createdUser.OrganizationName,
-                            organizationContact = createdUser.OrganizationContact,
-                            assignedRole = "Admin",
-                            createdAt = createdUser.CreatedAt
-                        },
-                        roles
+                        email = request.Email,
+                        expiresAt = result.ExpiresAt
                     },
                     statusCode = 200
                 });
@@ -328,50 +300,51 @@ namespace StartEvent_API.Controllers
                 return StatusCode(500, new
                 {
                     message = "Internal server error",
-                    error = "An unexpected error occurred during admin user creation",
+                    error = "An unexpected error occurred while sending verification code",
                     details = ex.Message,
                     statusCode = 500
                 });
             }
         }
 
-        /// <summary>
-        /// Gets all admin users in the system. Only accessible by existing admin users.
-        /// </summary>
-        [HttpGet("admin-users")]
-        [Authorize(Roles = "Admin")]
-        [ProducesResponseType(200, Type = typeof(object))]
-        [ProducesResponseType(401)]
-        [ProducesResponseType(403)]
+        [HttpPost("verify-email")]
+        [ProducesResponseType(200, Type = typeof(VerifyEmailResponse))]
+        [ProducesResponseType(400)]
+        [ProducesResponseType(422)]
         [ProducesResponseType(500)]
-        public async Task<IActionResult> GetAllAdminUsers()
+        public async Task<IActionResult> VerifyEmail([FromBody] VerifyEmailRequest request)
         {
             try
             {
-                var adminUsers = await _authService.GetAllAdminUsersAsync();
-
-                var adminUserDtos = adminUsers.Select(user => new
+                if (!ModelState.IsValid)
                 {
-                    id = user.Id,
-                    email = user.Email,
-                    fullName = user.FullName,
-                    address = user.Address,
-                    dateOfBirth = user.DateOfBirth,
-                    organizationName = user.OrganizationName,
-                    organizationContact = user.OrganizationContact,
-                    isActive = user.IsActive,
-                    emailConfirmed = user.EmailConfirmed,
-                    createdAt = user.CreatedAt,
-                    lastLogin = user.LastLogin
-                }).ToList();
+                    return UnprocessableEntity(new
+                    {
+                        message = "Validation failed",
+                        errors = ModelState.Values.SelectMany(v => v.Errors.Select(e => e.ErrorMessage)),
+                        statusCode = 422
+                    });
+                }
+
+                var result = await _authService.VerifyEmailAsync(request);
+
+                if (!result.Success)
+                {
+                    return BadRequest(new
+                    {
+                        message = result.Message,
+                        statusCode = 400
+                    });
+                }
 
                 return Ok(new
                 {
-                    message = "Admin users retrieved successfully",
+                    message = result.Message,
                     data = new
                     {
-                        totalCount = adminUserDtos.Count,
-                        adminUsers = adminUserDtos
+                        email = request.Email,
+                        isVerified = true,
+                        verifiedAt = DateTime.UtcNow
                     },
                     statusCode = 200
                 });
@@ -381,12 +354,69 @@ namespace StartEvent_API.Controllers
                 return StatusCode(500, new
                 {
                     message = "Internal server error",
-                    error = "An unexpected error occurred while retrieving admin users",
+                    error = "An unexpected error occurred while verifying email",
                     details = ex.Message,
                     statusCode = 500
                 });
             }
         }
+
+        [HttpPost("resend-verification")]
+        [ProducesResponseType(200, Type = typeof(ResendVerificationResponse))]
+        [ProducesResponseType(400)]
+        [ProducesResponseType(422)]
+        [ProducesResponseType(500)]
+        public async Task<IActionResult> ResendEmailVerification([FromBody] ResendEmailVerificationRequest request)
+        {
+            try
+            {
+                if (!ModelState.IsValid)
+                {
+                    return UnprocessableEntity(new
+                    {
+                        message = "Validation failed",
+                        errors = ModelState.Values.SelectMany(v => v.Errors.Select(e => e.ErrorMessage)),
+                        statusCode = 422
+                    });
+                }
+
+                var result = await _authService.ResendEmailVerificationAsync(request);
+
+                if (!result.Success)
+                {
+                    return BadRequest(new
+                    {
+                        message = result.Message,
+                        statusCode = 400
+                    });
+                }
+
+                return Ok(new
+                {
+                    message = result.Message,
+                    data = new
+                    {
+                        email = request.Email,
+                        expiresAt = result.ExpiresAt,
+                        remainingAttempts = result.RemainingAttempts,
+                        retryAfter = result.RetryAfter
+                    },
+                    statusCode = 200
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    message = "Internal server error",
+                    error = "An unexpected error occurred while resending verification code",
+                    details = ex.Message,
+                    statusCode = 500
+                });
+            }
+        }
+
+        #endregion
     }
 
     // Request models
@@ -423,24 +453,5 @@ namespace StartEvent_API.Controllers
     {
         public string Email { get; set; } = string.Empty;
         public string Password { get; set; } = string.Empty;
-    }
-
-    public class CreateAdminRequest
-    {
-        [Required(ErrorMessage = "Email is required")]
-        [EmailAddress(ErrorMessage = "Invalid email format")]
-        public string Email { get; set; } = string.Empty;
-
-        [Required(ErrorMessage = "Password is required")]
-        [StringLength(100, MinimumLength = 8, ErrorMessage = "Password must be at least 8 characters long")]
-        public string Password { get; set; } = string.Empty;
-
-        [Required(ErrorMessage = "Full name is required")]
-        public string FullName { get; set; } = string.Empty;
-
-        public string? Address { get; set; }
-        public DateTime? DateOfBirth { get; set; }
-        public string? OrganizationName { get; set; }
-        public string? OrganizationContact { get; set; }
     }
 }
