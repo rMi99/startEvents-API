@@ -6,6 +6,7 @@ using StartEvent_API.Helper;
 using StartEvent_API.Models.Auth;
 using Microsoft.AspNetCore.Identity;
 using System.ComponentModel.DataAnnotations;
+using System.Security.Claims;
 
 namespace StartEvent_API.Controllers
 {
@@ -560,6 +561,243 @@ namespace StartEvent_API.Controllers
                 {
                     message = "Internal server error",
                     error = "An unexpected error occurred while retrieving admin users",
+                    details = ex.Message,
+                    statusCode = 500
+                });
+            }
+        }
+
+        /// <summary>
+        /// Gets the profile information of the currently logged-in user
+        /// </summary>
+        [HttpGet("profile")]
+        [Authorize]
+        [ProducesResponseType(200, Type = typeof(object))]
+        [ProducesResponseType(401)]
+        [ProducesResponseType(404)]
+        [ProducesResponseType(500)]
+        public async Task<IActionResult> GetUserProfile()
+        {
+            try
+            {
+                var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                if (string.IsNullOrEmpty(userId))
+                {
+                    return Unauthorized(new
+                    {
+                        message = "Invalid token or user not found",
+                        statusCode = 401
+                    });
+                }
+
+                var userProfile = await _authService.GetUserProfileAsync(userId);
+                if (userProfile == null)
+                {
+                    return NotFound(new
+                    {
+                        message = "User profile not found",
+                        statusCode = 404
+                    });
+                }
+
+                return Ok(new
+                {
+                    message = "User profile retrieved successfully",
+                    data = userProfile,
+                    statusCode = 200
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    message = "Internal server error",
+                    error = "An unexpected error occurred while retrieving user profile",
+                    details = ex.Message,
+                    statusCode = 500
+                });
+            }
+        }
+
+        /// <summary>
+        /// Updates the full name of the currently logged-in user
+        /// </summary>
+        [HttpPut("update-name")]
+        [Authorize]
+        [ProducesResponseType(200, Type = typeof(object))]
+        [ProducesResponseType(400)]
+        [ProducesResponseType(401)]
+        [ProducesResponseType(404)]
+        [ProducesResponseType(500)]
+        public async Task<IActionResult> UpdateUserName([FromBody] UpdateUserNameRequest request)
+        {
+            try
+            {
+                if (!ModelState.IsValid)
+                {
+                    var errors = ModelState.Values
+                        .SelectMany(v => v.Errors)
+                        .Select(e => e.ErrorMessage)
+                        .ToList();
+
+                    return BadRequest(new
+                    {
+                        message = "Validation failed",
+                        errors = errors,
+                        statusCode = 400
+                    });
+                }
+
+                var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                if (string.IsNullOrEmpty(userId))
+                {
+                    return Unauthorized(new
+                    {
+                        message = "Invalid token or user not found",
+                        statusCode = 401
+                    });
+                }
+
+                var result = await _authService.UpdateUserNameAsync(userId, request.FullName);
+                if (!result)
+                {
+                    return NotFound(new
+                    {
+                        message = "User not found or update failed",
+                        statusCode = 404
+                    });
+                }
+
+                return Ok(new
+                {
+                    message = "User name updated successfully",
+                    data = new
+                    {
+                        fullName = request.FullName,
+                        updatedAt = DateTime.UtcNow
+                    },
+                    statusCode = 200
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    message = "Internal server error",
+                    error = "An unexpected error occurred while updating user name",
+                    details = ex.Message,
+                    statusCode = 500
+                });
+            }
+        }
+
+        /// <summary>
+        /// Initiates a password reset by sending a reset token to the user's email
+        /// </summary>
+        [HttpPost("reset-password")]
+        [ProducesResponseType(200, Type = typeof(object))]
+        [ProducesResponseType(400)]
+        [ProducesResponseType(500)]
+        public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request)
+        {
+            try
+            {
+                if (!ModelState.IsValid)
+                {
+                    var errors = ModelState.Values
+                        .SelectMany(v => v.Errors)
+                        .Select(e => e.ErrorMessage)
+                        .ToList();
+
+                    return BadRequest(new
+                    {
+                        message = "Validation failed",
+                        errors = errors,
+                        statusCode = 400
+                    });
+                }
+
+                var result = await _authService.InitiatePasswordResetAsync(request.Email);
+
+                return Ok(new
+                {
+                    message = result.Message,
+                    data = new
+                    {
+                        email = request.Email,
+                        success = result.Success,
+                        resetToken = result.ResetToken // Remove this in production - should only be sent via email
+                    },
+                    statusCode = 200
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    message = "Internal server error",
+                    error = "An unexpected error occurred while processing password reset request",
+                    details = ex.Message,
+                    statusCode = 500
+                });
+            }
+        }
+
+        /// <summary>
+        /// Confirms password reset with the reset token and sets a new password
+        /// </summary>
+        [HttpPost("confirm-password-reset")]
+        [ProducesResponseType(200, Type = typeof(object))]
+        [ProducesResponseType(400)]
+        [ProducesResponseType(500)]
+        public async Task<IActionResult> ConfirmPasswordReset([FromBody] ConfirmPasswordResetRequest request)
+        {
+            try
+            {
+                if (!ModelState.IsValid)
+                {
+                    var errors = ModelState.Values
+                        .SelectMany(v => v.Errors)
+                        .Select(e => e.ErrorMessage)
+                        .ToList();
+
+                    return BadRequest(new
+                    {
+                        message = "Validation failed",
+                        errors = errors,
+                        statusCode = 400
+                    });
+                }
+
+                var result = await _authService.ConfirmPasswordResetAsync(request.Email, request.ResetToken, request.NewPassword);
+
+                if (!result)
+                {
+                    return BadRequest(new
+                    {
+                        message = "Invalid reset token or password reset failed",
+                        error = "The reset token may be invalid, expired, or the email address may not exist",
+                        statusCode = 400
+                    });
+                }
+
+                return Ok(new
+                {
+                    message = "Password reset successfully",
+                    data = new
+                    {
+                        email = request.Email,
+                        resetAt = DateTime.UtcNow
+                    },
+                    statusCode = 200
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    message = "Internal server error",
+                    error = "An unexpected error occurred while confirming password reset",
                     details = ex.Message,
                     statusCode = 500
                 });

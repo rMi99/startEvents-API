@@ -13,6 +13,12 @@ namespace StartEvent_API.Business
         Task<EmailVerificationResponse> SendEmailVerificationAsync(SendEmailVerificationRequest request);
         Task<VerifyEmailResponse> VerifyEmailAsync(VerifyEmailRequest request);
         Task<ResendVerificationResponse> ResendEmailVerificationAsync(ResendEmailVerificationRequest request);
+
+        // New user profile and management methods
+        Task<UserProfileResponse?> GetUserProfileAsync(string userId);
+        Task<bool> UpdateUserNameAsync(string userId, string newFullName);
+        Task<ResetPasswordResponse> InitiatePasswordResetAsync(string email);
+        Task<bool> ConfirmPasswordResetAsync(string email, string resetToken, string newPassword);
     }
 }
 
