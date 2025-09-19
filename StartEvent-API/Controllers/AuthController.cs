@@ -804,6 +804,181 @@ namespace StartEvent_API.Controllers
             }
         }
 
+        [HttpPost("forgot-password")]
+        [ProducesResponseType(200, Type = typeof(object))]
+        [ProducesResponseType(400)]
+        [ProducesResponseType(429)]
+        [ProducesResponseType(500)]
+        public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
+        {
+            try
+            {
+                if (!ModelState.IsValid)
+                {
+                    return BadRequest(new
+                    {
+                        message = "Validation failed",
+                        errors = ModelState.Values.SelectMany(v => v.Errors.Select(e => e.ErrorMessage)),
+                        statusCode = 400
+                    });
+                }
+
+                var result = await _authService.SendPasswordResetOtpAsync(request.Email);
+
+                if (!result.Success)
+                {
+                    if (result.RemainingAttempts == 0)
+                    {
+                        return StatusCode(429, new
+                        {
+                            message = result.Message,
+                            statusCode = 429,
+                            data = new
+                            {
+                                remainingAttempts = result.RemainingAttempts,
+                                retryAfter = "1 hour"
+                            }
+                        });
+                    }
+
+                    return BadRequest(new
+                    {
+                        message = result.Message,
+                        statusCode = 400
+                    });
+                }
+
+                return Ok(new
+                {
+                    message = result.Message,
+                    data = new
+                    {
+                        email = request.Email,
+                        expiresAt = result.ExpiresAt,
+                        remainingAttempts = result.RemainingAttempts,
+                        sentAt = DateTime.UtcNow
+                    },
+                    statusCode = 200
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    message = "Internal server error",
+                    error = "An unexpected error occurred while processing forgot password request",
+                    details = ex.Message,
+                    statusCode = 500
+                });
+            }
+        }
+
+        [HttpPost("verify-reset-otp")]
+        [ProducesResponseType(200, Type = typeof(object))]
+        [ProducesResponseType(400)]
+        [ProducesResponseType(500)]
+        public async Task<IActionResult> VerifyPasswordResetOtp([FromBody] VerifyPasswordResetOtpRequest request)
+        {
+            try
+            {
+                if (!ModelState.IsValid)
+                {
+                    return BadRequest(new
+                    {
+                        message = "Validation failed",
+                        errors = ModelState.Values.SelectMany(v => v.Errors.Select(e => e.ErrorMessage)),
+                        statusCode = 400
+                    });
+                }
+
+                var result = await _authService.VerifyPasswordResetOtpAsync(request.Email, request.Otp);
+
+                if (!result.Success)
+                {
+                    return BadRequest(new
+                    {
+                        message = result.Message,
+                        statusCode = 400
+                    });
+                }
+
+                return Ok(new
+                {
+                    message = result.Message,
+                    data = new
+                    {
+                        email = request.Email,
+                        resetToken = result.ResetToken,
+                        verifiedAt = DateTime.UtcNow,
+                        tokenExpiresAt = DateTime.UtcNow.AddMinutes(30)
+                    },
+                    statusCode = 200
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    message = "Internal server error",
+                    error = "An unexpected error occurred while verifying OTP",
+                    details = ex.Message,
+                    statusCode = 500
+                });
+            }
+        }
+
+        [HttpPost("reset-password-otp")]
+        [ProducesResponseType(200, Type = typeof(object))]
+        [ProducesResponseType(400)]
+        [ProducesResponseType(500)]
+        public async Task<IActionResult> ResetPasswordWithOtp([FromBody] ResetPasswordWithOtpRequest request)
+        {
+            try
+            {
+                if (!ModelState.IsValid)
+                {
+                    return BadRequest(new
+                    {
+                        message = "Validation failed",
+                        errors = ModelState.Values.SelectMany(v => v.Errors.Select(e => e.ErrorMessage)),
+                        statusCode = 400
+                    });
+                }
+
+                var success = await _authService.ResetPasswordWithOtpAsync(request.Email, request.ResetToken, request.NewPassword);
+
+                if (!success)
+                {
+                    return BadRequest(new
+                    {
+                        message = "Failed to reset password. The reset token may be invalid, expired, or the email may not exist.",
+                        statusCode = 400
+                    });
+                }
+
+                return Ok(new
+                {
+                    message = "Password has been reset successfully. You can now log in with your new password.",
+                    data = new
+                    {
+                        email = request.Email,
+                        resetAt = DateTime.UtcNow
+                    },
+                    statusCode = 200
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    message = "Internal server error",
+                    error = "An unexpected error occurred while resetting password",
+                    details = ex.Message,
+                    statusCode = 500
+                });
+            }
+        }
+
         #endregion
     }
 

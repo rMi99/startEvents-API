@@ -21,6 +21,14 @@ namespace StartEvent_API.Data.Entities
         public string? EmailVerificationCode { get; set; }
         public DateTime? EmailVerificationCodeExpiry { get; set; }
 
+        // Password reset OTP properties
+        public string? PasswordResetOtp { get; set; }
+        public DateTime? PasswordResetOtpExpiry { get; set; }
+        public string? PasswordResetToken { get; set; }
+        public DateTime? PasswordResetTokenExpiry { get; set; }
+        public int PasswordResetAttempts { get; set; } = 0;
+        public DateTime? PasswordResetLastAttempt { get; set; }
+
         public ICollection<Ticket>? Tickets { get; set; }
         public ICollection<Event>? OrganizedEvents { get; set; }
     }
