@@ -136,6 +136,49 @@ namespace StartEvent_API.Business
             }
         }
 
+        public async Task<ApplicationUser?> CreateAdminUserAsync(ApplicationUser user, string password)
+        {
+            try
+            {
+                // Check if user already exists
+                if (await _authRepository.UserExistsAsync(user.Email ?? string.Empty))
+                {
+                    return null;
+                }
+
+                // Set additional properties for admin user
+                user.CreatedAt = DateTime.UtcNow;
+                user.IsActive = true;
+                user.EmailConfirmed = true; // Admin users are automatically verified
+
+                var result = await _authRepository.CreateUserAsync(user, password);
+                if (!result.Succeeded)
+                {
+                    return null;
+                }
+
+                // Get the created user
+                var createdUser = await _authRepository.GetUserByEmailAsync(user.Email ?? string.Empty);
+                if (createdUser == null)
+                {
+                    return null;
+                }
+
+                // Assign Admin role
+                await _authRepository.AddToRoleAsync(createdUser, "Admin");
+
+                // Send welcome email
+                await SendWelcomeEmailAsync(createdUser);
+
+                return createdUser;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error creating admin user with email {Email}", user.Email);
+                return null;
+            }
+        }
+
         private async Task SendWelcomeEmailAsync(ApplicationUser user)
         {
             try
