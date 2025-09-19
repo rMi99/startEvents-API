@@ -81,8 +81,19 @@ builder.Services.AddScoped<StartEvent_API.Business.IQrService, StartEvent_API.Bu
 
 builder.Services.AddScoped<StartEvent_API.Repositories.IUserRepository, StartEvent_API.Repositories.UserRepository>();
 
-// 6️⃣ Add controllers and Swagger
-builder.Services.AddControllers();
+// 6️⃣ Add controllers and Swagger with JSON configuration
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        // Handle circular references with Preserve handler
+        options.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.Preserve;
+        // Set max depth to prevent infinite loops
+        options.JsonSerializerOptions.MaxDepth = 64;
+        // Optional: Use camelCase for property names
+        options.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
+        // Write indented JSON for better readability
+        options.JsonSerializerOptions.WriteIndented = true;
+    });
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
