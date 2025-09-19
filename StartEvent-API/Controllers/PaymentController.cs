@@ -3,9 +3,12 @@ using Microsoft.AspNetCore.Mvc;
 using StartEvent_API.Data.Entities;
 using StartEvent_API.Repositories;
 using StartEvent_API.Business;
+using StartEvent_API.Models.Email;
+using StartEvent_API.Services.Email;
 using System.Security.Claims;
 using Stripe;
 using Stripe.Checkout;
+using Microsoft.EntityFrameworkCore;
 
 namespace StartEvent_API.Controllers
 {
@@ -17,17 +20,23 @@ namespace StartEvent_API.Controllers
         private readonly ITicketRepository _ticketRepository;
         private readonly IQrService _qrService;
         private readonly IConfiguration _configuration;
+        private readonly IEmailService _emailService;
+        private readonly ILogger<PaymentController> _logger;
 
         public PaymentController(
-            IPaymentRepository paymentRepository, 
-            ITicketRepository ticketRepository, 
+            IPaymentRepository paymentRepository,
+            ITicketRepository ticketRepository,
             IQrService qrService,
-            IConfiguration configuration)
+            IConfiguration configuration,
+            IEmailService emailService,
+            ILogger<PaymentController> logger)
         {
             _paymentRepository = paymentRepository;
             _ticketRepository = ticketRepository;
             _qrService = qrService;
             _configuration = configuration;
+            _emailService = emailService;
+            _logger = logger;
             StripeConfiguration.ApiKey = _configuration["Stripe:SecretKey"];
         }
 
@@ -57,7 +66,7 @@ namespace StartEvent_API.Controllers
                     return BadRequest(new { Message = "Ticket must be paid before generating QR code" });
 
                 var qrResult = await _qrService.GenerateQrCodeAsync(ticket.Id, ticket.CustomerId);
-                
+
                 if (qrResult.Success)
                 {
                     return Ok(new
@@ -313,9 +322,9 @@ namespace StartEvent_API.Controllers
                 return BadRequest(new { Message = "Invalid session ID", Error = ex.Message });
             }
         }
-        
-     
-        
+
+
+
         /// <summary>
         /// Webhook endpoint for Stripe payment confirmations
         /// </summary>
@@ -378,6 +387,9 @@ namespace StartEvent_API.Controllers
                 };
                 await _paymentRepository.CreateAsync(payment);
 
+                // Send payment and ticket confirmation emails
+                await SendTicketConfirmationEmailAsync(ticket, payment);
+
                 // Generate QR code automatically after successful payment
                 try
                 {
@@ -404,6 +416,79 @@ namespace StartEvent_API.Controllers
                     Console.WriteLine($"Exception during QR generation for ticket {ticketId}: {ex.Message}");
                     Console.WriteLine($"Stack trace: {ex.StackTrace}");
                 }
+            }
+        }
+
+        /// <summary>
+        /// Sends ticket confirmation and payment confirmation emails
+        /// </summary>
+        private async Task SendTicketConfirmationEmailAsync(Ticket ticket, Data.Entities.Payment payment)
+        {
+            try
+            {
+                // Get ticket with related data for email
+                var ticketWithDetails = await _ticketRepository.GetByIdAsync(ticket.Id);
+                if (ticketWithDetails == null) return;
+
+                // Get customer information (assuming you have a way to get user details)
+                // This is a simplified version - you might need to inject UserManager or create a user repository
+                var customerEmail = ""; // You'll need to get this from your user system
+                var customerName = ""; // You'll need to get this from your user system
+
+                // For now, let's create a basic email - you should enhance this with proper user data
+                var ticketConfirmationEmail = new TicketConfirmationEmailTemplate
+                {
+                    To = new EmailRecipient
+                    {
+                        Email = customerEmail,
+                        Name = customerName
+                    },
+                    Ticket = ticket,
+                    Event = new StartEvent_API.Data.Entities.Event(), // You'll need to load the actual event
+                    Venue = new Venue(), // You'll need to load the actual venue
+                    Subject = $"Your Ticket Confirmation - Order #{ticket.TicketNumber}"
+                };
+
+                // Send ticket confirmation email
+                var ticketResult = await _emailService.SendTicketConfirmationEmailAsync(ticketConfirmationEmail);
+                if (ticketResult.Success)
+                {
+                    _logger.LogInformation("Ticket confirmation email sent for ticket {TicketId}", ticket.Id);
+                }
+                else
+                {
+                    _logger.LogWarning("Failed to send ticket confirmation email for ticket {TicketId}: {Error}",
+                        ticket.Id, ticketResult.ErrorMessage);
+                }
+
+                // Send payment confirmation email
+                var paymentConfirmationEmail = new PaymentConfirmationEmailTemplate
+                {
+                    To = new EmailRecipient
+                    {
+                        Email = customerEmail,
+                        Name = customerName
+                    },
+                    Payment = payment,
+                    Ticket = ticket,
+                    Event = new StartEvent_API.Data.Entities.Event(), // You'll need to load the actual event
+                    Subject = $"Payment Confirmation - Transaction #{payment.TransactionId}"
+                };
+
+                var paymentResult = await _emailService.SendPaymentConfirmationEmailAsync(paymentConfirmationEmail);
+                if (paymentResult.Success)
+                {
+                    _logger.LogInformation("Payment confirmation email sent for payment {PaymentId}", payment.Id);
+                }
+                else
+                {
+                    _logger.LogWarning("Failed to send payment confirmation email for payment {PaymentId}: {Error}",
+                        payment.Id, paymentResult.ErrorMessage);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Exception occurred while sending confirmation emails for ticket {TicketId}", ticket.Id);
             }
         }
     }

@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Identity;
 using StartEvent_API.Data.Entities;
 using StartEvent_API.Helper;
+using StartEvent_API.Models.Email;
 using StartEvent_API.Repositories;
+using StartEvent_API.Services.Email;
 
 namespace StartEvent_API.Business
 {
@@ -11,17 +13,23 @@ namespace StartEvent_API.Business
         private readonly IJwtService _jwtService;
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly SignInManager<ApplicationUser> _signInManager;
+        private readonly IEmailService _emailService;
+        private readonly ILogger<AuthService> _logger;
 
         public AuthService(
             IAuthRepository authRepository,
             IJwtService jwtService,
             UserManager<ApplicationUser> userManager,
-            SignInManager<ApplicationUser> signInManager)
+            SignInManager<ApplicationUser> signInManager,
+            IEmailService emailService,
+            ILogger<AuthService> logger)
         {
             _authRepository = authRepository;
             _jwtService = jwtService;
             _userManager = userManager;
             _signInManager = signInManager;
+            _emailService = emailService;
+            _logger = logger;
         }
 
         public async Task<ApplicationUser?> RegisterAsync(ApplicationUser user, string password)
@@ -39,7 +47,7 @@ namespace StartEvent_API.Business
                 user.IsActive = true;
 
                 var result = await _authRepository.CreateUserAsync(user, password);
-                
+
                 if (!result.Succeeded)
                 {
                     // Log the specific errors
@@ -51,7 +59,7 @@ namespace StartEvent_API.Business
                 // Assign role based on organization name
                 string role = string.IsNullOrEmpty(user.OrganizationName) ? "Customer" : "Organizer";
                 var roleResult = await _authRepository.AddToRoleAsync(user, role);
-                
+
                 if (!roleResult.Succeeded)
                 {
                     // Log role assignment errors
@@ -63,6 +71,9 @@ namespace StartEvent_API.Business
                 // Update last login
                 user.LastLogin = DateTime.UtcNow;
                 await _authRepository.UpdateUserAsync(user);
+
+                // Send welcome email
+                await SendWelcomeEmailAsync(user);
 
                 return user;
             }
@@ -122,6 +133,42 @@ namespace StartEvent_API.Business
             catch
             {
                 return false;
+            }
+        }
+
+        private async Task SendWelcomeEmailAsync(ApplicationUser user)
+        {
+            try
+            {
+                var welcomeEmail = new WelcomeEmailTemplate
+                {
+                    To = new EmailRecipient
+                    {
+                        Email = user.Email ?? string.Empty,
+                        Name = user.FullName ?? user.UserName ?? "User"
+                    },
+                    User = user,
+                    Subject = $"Welcome to StartEvent, {user.FullName ?? user.UserName}!",
+                    // You can add verification and dashboard links here if needed
+                    // VerificationLink = "https://yourdomain.com/verify-email?token=...",
+                    // DashboardLink = "https://yourdomain.com/dashboard"
+                };
+
+                var result = await _emailService.SendWelcomeEmailAsync(welcomeEmail);
+
+                if (result.Success)
+                {
+                    _logger.LogInformation("Welcome email sent successfully to {Email}", user.Email);
+                }
+                else
+                {
+                    _logger.LogWarning("Failed to send welcome email to {Email}: {Error}",
+                        user.Email, result.ErrorMessage);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Exception occurred while sending welcome email to {Email}", user.Email);
             }
         }
     }
