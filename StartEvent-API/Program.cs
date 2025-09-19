@@ -59,6 +59,15 @@ builder.Services.AddAuthentication(options =>
 });
 
 // 5️⃣ Register custom services
+// 5️⃣ Configure Email Services
+builder.Services.Configure<StartEvent_API.Models.Email.EmailConfiguration>(
+    builder.Configuration.GetSection("Email"));
+
+// Register email services
+builder.Services.AddScoped<StartEvent_API.Services.Email.IEmailService, StartEvent_API.Services.Email.Implementations.BrevoEmailService>();
+builder.Services.AddScoped<StartEvent_API.Services.Email.IEmailTemplateService, StartEvent_API.Services.Email.Implementations.EmailTemplateService>();
+
+// Repository services
 builder.Services.AddScoped<StartEvent_API.Repositories.IAuthRepository, StartEvent_API.Repositories.AuthRepository>();
 builder.Services.AddScoped<StartEvent_API.Repositories.IAdminRepository, StartEvent_API.Repositories.AdminRepository>();
 builder.Services.AddScoped<StartEvent_API.Repositories.ITicketRepository, StartEvent_API.Repositories.TicketRepository>();
