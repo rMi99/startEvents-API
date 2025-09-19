@@ -447,5 +447,158 @@ namespace StartEvent_API.Business
         }
 
         #endregion
+
+        #region User Profile Management
+
+        public async Task<UserProfileResponse?> GetUserProfileAsync(string userId)
+        {
+            try
+            {
+                var user = await _userManager.FindByIdAsync(userId);
+                if (user == null)
+                {
+                    _logger.LogWarning("User not found with ID: {UserId}", userId);
+                    return null;
+                }
+
+                var roles = await _userManager.GetRolesAsync(user);
+
+                return new UserProfileResponse
+                {
+                    Id = user.Id,
+                    Email = user.Email ?? string.Empty,
+                    FullName = user.FullName ?? string.Empty,
+                    Address = user.Address,
+                    OrganizationName = user.OrganizationName,
+                    OrganizationContact = user.OrganizationContact,
+                    DateOfBirth = user.DateOfBirth,
+                    IsActive = user.IsActive,
+                    EmailConfirmed = user.EmailConfirmed,
+                    IsEmailVerified = user.IsEmailVerified,
+                    CreatedAt = user.CreatedAt,
+                    LastLogin = user.LastLogin,
+                    Roles = roles.ToList()
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error occurred while retrieving user profile for user ID: {UserId}", userId);
+                return null;
+            }
+        }
+
+        public async Task<bool> UpdateUserNameAsync(string userId, string newFullName)
+        {
+            try
+            {
+                var user = await _userManager.FindByIdAsync(userId);
+                if (user == null)
+                {
+                    _logger.LogWarning("User not found with ID: {UserId}", userId);
+                    return false;
+                }
+
+                user.FullName = newFullName;
+                var result = await _userManager.UpdateAsync(user);
+
+                if (result.Succeeded)
+                {
+                    _logger.LogInformation("User name updated successfully for user ID: {UserId}", userId);
+                    return true;
+                }
+                else
+                {
+                    var errors = string.Join(", ", result.Errors.Select(e => e.Description));
+                    _logger.LogWarning("Failed to update user name for user ID: {UserId}. Errors: {Errors}", userId, errors);
+                    return false;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error occurred while updating user name for user ID: {UserId}", userId);
+                return false;
+            }
+        }
+
+        public async Task<ResetPasswordResponse> InitiatePasswordResetAsync(string email)
+        {
+            try
+            {
+                var user = await _userManager.FindByEmailAsync(email);
+                if (user == null)
+                {
+                    // For security reasons, don't reveal whether the email exists
+                    _logger.LogWarning("Password reset attempted for non-existent email: {Email}", email);
+                    return new ResetPasswordResponse
+                    {
+                        Success = true,
+                        Message = "If the email address exists in our system, a password reset link has been sent."
+                    };
+                }
+
+                // Generate password reset token
+                var resetToken = await _userManager.GeneratePasswordResetTokenAsync(user);
+
+                // TODO: Send password reset email with token
+                // For now, we'll return the token (in production, this should be sent via email only)
+                _logger.LogInformation("Password reset token generated for user: {Email}", email);
+
+                return new ResetPasswordResponse
+                {
+                    Success = true,
+                    Message = "Password reset instructions have been sent to your email address.",
+                    ResetToken = resetToken // In production, remove this and send via email
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error occurred while initiating password reset for email: {Email}", email);
+                return new ResetPasswordResponse
+                {
+                    Success = false,
+                    Message = "An error occurred while processing your password reset request. Please try again later."
+                };
+            }
+        }
+
+        public async Task<bool> ConfirmPasswordResetAsync(string email, string resetToken, string newPassword)
+        {
+            try
+            {
+                var user = await _userManager.FindByEmailAsync(email);
+                if (user == null)
+                {
+                    _logger.LogWarning("Password reset confirmation attempted for non-existent email: {Email}", email);
+                    return false;
+                }
+
+                // Reset the password using the token
+                var result = await _userManager.ResetPasswordAsync(user, resetToken, newPassword);
+
+                if (result.Succeeded)
+                {
+                    _logger.LogInformation("Password reset successfully for user: {Email}", email);
+
+                    // Update last login time
+                    user.LastLogin = DateTime.UtcNow;
+                    await _userManager.UpdateAsync(user);
+
+                    return true;
+                }
+                else
+                {
+                    var errors = string.Join(", ", result.Errors.Select(e => e.Description));
+                    _logger.LogWarning("Failed to reset password for user: {Email}. Errors: {Errors}", email, errors);
+                    return false;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error occurred while confirming password reset for email: {Email}", email);
+                return false;
+            }
+        }
+
+        #endregion
     }
 }
