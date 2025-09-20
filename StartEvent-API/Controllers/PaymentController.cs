@@ -137,6 +137,24 @@ namespace StartEvent_API.Controllers
                             TransactionId = null
                         };
                         await _paymentRepository.CreateAsync(payment);
+
+                        // Award loyalty points for manual payments too
+                        try
+                        {
+                            var earnedPoints = await _loyaltyService.CalculateEarnedPointsAsync(ticket.TotalAmount);
+                            if (earnedPoints > 0)
+                            {
+                                await _loyaltyService.AddPointsAsync(
+                                    ticket.CustomerId, 
+                                    earnedPoints, 
+                                    $"Earned {earnedPoints} points from manual payment (LKR {ticket.TotalAmount:F2})"
+                                );
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"Exception during loyalty points award for manual payment {ticket.Id}: {ex.Message}");
+                        }
                     }
 
                     try
@@ -204,7 +222,7 @@ namespace StartEvent_API.Controllers
                                 Description = $"{quantity} ticket(s) for {ticket.Event.Title}",
                             },
                         },
-                        Quantity = quantity, // Use quantity from frontend
+                        Quantity = 1,
                     },
                 },
                 Mode = "payment",
@@ -400,6 +418,33 @@ namespace StartEvent_API.Controllers
 
                 // Send payment and ticket confirmation emails
                 await SendTicketConfirmationEmailAsync(ticket, payment);
+                // Award loyalty points (10% of ticket purchase price)
+                try
+                {
+                    var earnedPoints = await _loyaltyService.CalculateEarnedPointsAsync(ticket.TotalAmount);
+                    if (earnedPoints > 0)
+                    {
+                        var loyaltySuccess = await _loyaltyService.AddPointsAsync(
+                            ticket.CustomerId, 
+                            earnedPoints, 
+                            $"Earned {earnedPoints} points from ticket purchase (LKR {ticket.TotalAmount:F2})"
+                        );
+                        
+                        if (loyaltySuccess)
+                        {
+                            Console.WriteLine($"Awarded {earnedPoints} loyalty points to customer {ticket.CustomerId} for ticket {ticketId}");
+                        }
+                        else
+                        {
+                            Console.WriteLine($"Failed to award loyalty points to customer {ticket.CustomerId} for ticket {ticketId}");
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // Log the error but don't fail the payment process
+                    Console.WriteLine($"Exception during loyalty points award for ticket {ticketId}: {ex.Message}");
+                }
 
                 // Generate QR code automatically after successful payment
                 try
