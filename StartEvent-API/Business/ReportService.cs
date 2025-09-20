@@ -1,5 +1,6 @@
 using StartEvent_API.Data.Entities;
 using StartEvent_API.Repositories;
+using StartEvent_API.Models.Reports;
 
 namespace StartEvent_API.Business
 {
@@ -105,6 +106,38 @@ namespace StartEvent_API.Business
                     TicketSalesByCategory = ticketSalesByCategory
                 }
             };
+        }
+
+        // Enhanced Organizer Report Methods
+
+        public async Task<SalesReportDto> GetOrganizerSalesReportAsync(string organizerId, DateTime? startDate = null, DateTime? endDate = null)
+        {
+            return await _reportRepository.GetOrganizerSalesReportAsync(organizerId, startDate, endDate);
+        }
+
+        public async Task<Dictionary<string, decimal>> GetOrganizerRevenueByMonthAsync(string organizerId, int year)
+        {
+            return await _reportRepository.GetOrganizerRevenueByMonthAsync(organizerId, year);
+        }
+
+        public async Task<List<SalesByEvent>> GetOrganizerEventPerformanceAsync(string organizerId, DateTime? startDate = null, DateTime? endDate = null)
+        {
+            return await _reportRepository.GetOrganizerEventPerformanceAsync(organizerId, startDate, endDate);
+        }
+
+        public async Task<List<SalesByPeriod>> GetOrganizerSalesByPeriodAsync(string organizerId, DateTime? startDate = null, DateTime? endDate = null, string periodType = "monthly")
+        {
+            return await _reportRepository.GetOrganizerSalesByPeriodAsync(organizerId, startDate, endDate, periodType);
+        }
+
+        public async Task<PaymentMethodBreakdown> GetOrganizerPaymentMethodsAsync(string organizerId, DateTime? startDate = null, DateTime? endDate = null)
+        {
+            return await _reportRepository.GetOrganizerPaymentMethodsAsync(organizerId, startDate, endDate);
+        }
+
+        public async Task<List<EventPerformance>> GetOrganizerEventSummaryAsync(string organizerId)
+        {
+            return await _reportRepository.GetOrganizerEventSummaryAsync(organizerId);
         }
     }
 }

@@ -1,4 +1,5 @@
 using StartEvent_API.Data.Entities;
+using StartEvent_API.Models.Reports;
 
 namespace StartEvent_API.Repositories
 {
@@ -8,7 +9,15 @@ namespace StartEvent_API.Repositories
         Task<IEnumerable<Ticket>> GetOrganizerTicketSalesAsync(string organizerId, DateTime? startDate = null, DateTime? endDate = null);
         Task<decimal> GetOrganizerRevenueAsync(string organizerId, DateTime? startDate = null, DateTime? endDate = null);
         Task<IEnumerable<Event>> GetOrganizerEventsAsync(string organizerId);
-        
+
+        // Enhanced Organizer Reports
+        Task<SalesReportDto> GetOrganizerSalesReportAsync(string organizerId, DateTime? startDate = null, DateTime? endDate = null);
+        Task<Dictionary<string, decimal>> GetOrganizerRevenueByMonthAsync(string organizerId, int year);
+        Task<List<SalesByEvent>> GetOrganizerEventPerformanceAsync(string organizerId, DateTime? startDate = null, DateTime? endDate = null);
+        Task<List<SalesByPeriod>> GetOrganizerSalesByPeriodAsync(string organizerId, DateTime? startDate = null, DateTime? endDate = null, string periodType = "monthly");
+        Task<PaymentMethodBreakdown> GetOrganizerPaymentMethodsAsync(string organizerId, DateTime? startDate = null, DateTime? endDate = null);
+        Task<List<EventPerformance>> GetOrganizerEventSummaryAsync(string organizerId);
+
         // Admin Reports
         Task<IEnumerable<Ticket>> GetSystemWideTicketSalesAsync(DateTime? startDate = null, DateTime? endDate = null);
         Task<decimal> GetSystemWideRevenueAsync(DateTime? startDate = null, DateTime? endDate = null);
