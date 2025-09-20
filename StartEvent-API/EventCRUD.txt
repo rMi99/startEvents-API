@@ -1,1 +1,0 @@
-"Event CRUD module placeholder" 

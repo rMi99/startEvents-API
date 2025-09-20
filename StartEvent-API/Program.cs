@@ -87,6 +87,7 @@ builder.Services.AddScoped<StartEvent_API.Business.IAuthService, StartEvent_API.
 builder.Services.AddScoped<StartEvent_API.Business.ITicketService, StartEvent_API.Business.TicketService>();
 builder.Services.AddScoped<StartEvent_API.Business.IReportService, StartEvent_API.Business.ReportService>();
 builder.Services.AddScoped<StartEvent_API.Business.IQrService, StartEvent_API.Business.QrService>();
+builder.Services.AddScoped<StartEvent_API.Business.ILoyaltyService, StartEvent_API.Business.LoyaltyService>();
 
 builder.Services.AddScoped<StartEvent_API.Repositories.IUserRepository, StartEvent_API.Repositories.UserRepository>();
 

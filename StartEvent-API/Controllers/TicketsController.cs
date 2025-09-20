@@ -4,6 +4,7 @@ using StartEvent_API.Business;
 using StartEvent_API.Data.Entities;
 using StartEvent_API.Models;
 using System.Security.Claims;
+using System.ComponentModel.DataAnnotations;
 
 namespace StartEvent_API.Controllers
 {
@@ -325,7 +326,11 @@ namespace StartEvent_API.Controllers
 
     public class UseLoyaltyPointsRequest
     {
+        [Required]
         public Guid TicketId { get; set; }
+        
+        [Required]
+        [Range(1, int.MaxValue, ErrorMessage = "Points must be greater than zero")]
         public int Points { get; set; }
     }
 }
