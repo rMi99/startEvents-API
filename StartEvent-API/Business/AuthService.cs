@@ -33,6 +33,7 @@ namespace StartEvent_API.Business
             _logger = logger;
         }
 
+        /// <inheritdoc />
         public async Task<ApplicationUser?> RegisterAsync(ApplicationUser user, string password)
         {
             try
@@ -89,6 +90,7 @@ namespace StartEvent_API.Business
             }
         }
 
+        /// <inheritdoc />
         public async Task<ApplicationUser?> LoginAsync(string email, string password)
         {
             try
@@ -131,6 +133,7 @@ namespace StartEvent_API.Business
             }
         }
 
+        /// <inheritdoc />
         public async Task<bool> LogoutAsync(string userId)
         {
             try
@@ -147,6 +150,7 @@ namespace StartEvent_API.Business
             }
         }
 
+        /// <inheritdoc />
         public async Task<ApplicationUser?> CreateAdminUserAsync(ApplicationUser user, string password)
         {
             try
@@ -190,6 +194,7 @@ namespace StartEvent_API.Business
             }
         }
 
+        /// <inheritdoc />
         public async Task<List<ApplicationUser>> GetAllAdminUsersAsync()
         {
             try
@@ -242,6 +247,7 @@ namespace StartEvent_API.Business
 
         #region Email Verification
 
+        /// <inheritdoc />
         public async Task<EmailVerificationResponse> SendEmailVerificationAsync(SendEmailVerificationRequest request)
         {
             try
@@ -284,6 +290,7 @@ namespace StartEvent_API.Business
             }
         }
 
+        /// <inheritdoc />
         public async Task<VerifyEmailResponse> VerifyEmailAsync(VerifyEmailRequest request)
         {
             try
@@ -362,6 +369,7 @@ namespace StartEvent_API.Business
             }
         }
 
+        /// <inheritdoc />
         public async Task<ResendVerificationResponse> ResendEmailVerificationAsync(ResendEmailVerificationRequest request)
         {
             try
@@ -450,6 +458,9 @@ namespace StartEvent_API.Business
 
         #region User Profile Management
 
+        #endregion
+
+        /// <inheritdoc />
         public async Task<UserProfileResponse?> GetUserProfileAsync(string userId)
         {
             try
@@ -487,6 +498,7 @@ namespace StartEvent_API.Business
             }
         }
 
+        /// <inheritdoc />
         public async Task<bool> UpdateUserNameAsync(string userId, string newFullName)
         {
             try
@@ -520,6 +532,7 @@ namespace StartEvent_API.Business
             }
         }
 
+        /// <inheritdoc />
         public async Task<ResetPasswordResponse> InitiatePasswordResetAsync(string email)
         {
             try
@@ -561,6 +574,7 @@ namespace StartEvent_API.Business
             }
         }
 
+        /// <inheritdoc />
         public async Task<bool> ConfirmPasswordResetAsync(string email, string resetToken, string newPassword)
         {
             try
@@ -601,6 +615,7 @@ namespace StartEvent_API.Business
 
         #region OTP-based Password Reset
 
+        /// <inheritdoc />
         public async Task<ForgotPasswordResponse> SendPasswordResetOtpAsync(string email)
         {
             try
@@ -702,6 +717,7 @@ namespace StartEvent_API.Business
             }
         }
 
+        /// <inheritdoc />
         public async Task<VerifyPasswordResetOtpResponse> VerifyPasswordResetOtpAsync(string email, string otp)
         {
             try
@@ -773,6 +789,7 @@ namespace StartEvent_API.Business
             }
         }
 
+        /// <inheritdoc />
         public async Task<bool> ResetPasswordWithOtpAsync(string email, string resetToken, string newPassword)
         {
             try
@@ -829,6 +846,5 @@ namespace StartEvent_API.Business
 
         #endregion
 
-        #endregion
     }
 }
